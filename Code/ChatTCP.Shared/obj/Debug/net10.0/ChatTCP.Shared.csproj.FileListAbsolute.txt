@@ -1,0 +1,11 @@
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\bin\Debug\net10.0\ChatTCP.Shared.deps.json
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\bin\Debug\net10.0\ChatTCP.Shared.dll
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\bin\Debug\net10.0\ChatTCP.Shared.pdb
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ChatTCP.Shared.GeneratedMSBuildEditorConfig.editorconfig
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ChatTCP.Shared.AssemblyInfoInputs.cache
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ChatTCP.Shared.AssemblyInfo.cs
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ChatTCP.Shared.csproj.CoreCompileInputs.cache
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ChatTCP.Shared.dll
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\refint\ChatTCP.Shared.dll
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ChatTCP.Shared.pdb
+D:\LTM_Nhom9-main\LTM_Nhom9-main\012012301303_Group9_UDM08\Code\ChatTCP.Shared\obj\Debug\net10.0\ref\ChatTCP.Shared.dll
