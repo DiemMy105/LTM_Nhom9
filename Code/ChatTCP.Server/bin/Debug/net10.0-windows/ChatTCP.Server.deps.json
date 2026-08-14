@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "ChatTCP.Server/1.0.0": {
+        "dependencies": {
+          "ChatTCP.Shared": "1.0.0"
+        },
+        "runtime": {
+          "ChatTCP.Server.dll": {}
+        }
+      },
+      "ChatTCP.Shared/1.0.0": {
+        "runtime": {
+          "ChatTCP.Shared.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ChatTCP.Server/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ChatTCP.Shared/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
