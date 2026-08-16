@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using ChatTCP.Shared.Models;
 using ChatTCP.Shared.Network;
+using Message = ChatTCP.Shared.Models.Message;
 
 namespace ChatTCP.Server.Network
 {
