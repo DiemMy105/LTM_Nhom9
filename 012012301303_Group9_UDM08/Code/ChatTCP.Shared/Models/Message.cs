@@ -18,5 +18,6 @@ namespace ChatTCP.Shared.Models
         public int? ReplyToMessageId { get; set; }
         public string? ReplyToSenderName { get; set; }
         public string? ReplyToContent { get; set; }
+        public bool IsForward { get; set; } = false;
     }
 }
