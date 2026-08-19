@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using ChatTCP.Shared.Models;
 using ChatTCP.Shared.Network;
+using Message = ChatTCP.Shared.Models.Message;
 
 namespace ChatTCP.Client.Network
 {
