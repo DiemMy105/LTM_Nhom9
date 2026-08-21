@@ -13,7 +13,7 @@ namespace ChatTCP.Server.Services
         public DatabaseService(string? connectionString = null)
         {
             _connectionString = connectionString 
-                ?? "Server=localhost;Database=ChatTCP;Trusted_Connection=True;TrustServerCertificate=True;";
+                ?? @"Server=(localdb)\MSSQLLocalDB;Database=ChatTCP;Trusted_Connection=True;TrustServerCertificate=True;";
         }
 
         private SqlConnection GetConnection()
