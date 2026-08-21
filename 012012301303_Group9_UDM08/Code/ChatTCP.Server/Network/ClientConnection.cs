@@ -35,21 +35,11 @@ namespace ChatTCP.Server.Network
                 string receivedData = "";
                 while (IsConnected)
                 {
-                    int bytesRead = stream.Read(
-                        buffer,
-                        0,
-                        buffer.Length
-                    );
-
+                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0)
                         break;
-
-                    receivedData += Encoding.UTF8.GetString(
-                        buffer,
-                        0,
-                        bytesRead
-                    );
-                    // Kiểm tra đã nhận đủ Message chưa
+                    receivedData += Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    // Kiểm tra và tách gói tin theo ký tự \n
                     while (receivedData.Contains("\n"))
                     {
                         int index = receivedData.IndexOf("\n");
@@ -57,16 +47,19 @@ namespace ChatTCP.Server.Network
                         receivedData = receivedData.Substring(index + 1);
                         if (string.IsNullOrWhiteSpace(data))
                             continue;
-                        Message message =
-                            MessageParser.Deserialize(data);
+                        // Giữ nguyên tên hàm Deserialize theo MessageParser.cs
+                        Message? message = MessageParser.Deserialize(data);
 
-                        MessageReceived?.Invoke(message);
+                        if (message != null)
+                        {
+                            MessageReceived?.Invoke(message);
+                        }
                     }
                 }
             }
             catch
             {
-                // Client ngắt kết nối
+                // Client ngắt kết nối an toàn
             }
         }
         // Gửi Message đến Client
@@ -74,8 +67,11 @@ namespace ChatTCP.Server.Network
         {
             try
             {
+                // Giữ nguyên tên hàm Serialize
                 string data = MessageParser.Serialize(message);
-                data += "\n";
+
+                if (string.IsNullOrEmpty(data)) return;
+
                 byte[] bytes = Encoding.UTF8.GetBytes(data);
                 stream.Write(bytes, 0, bytes.Length);
             }
@@ -84,6 +80,7 @@ namespace ChatTCP.Server.Network
                 // Xử lý lỗi gửi
             }
         }
+
         // Đóng kết nối
         public void Disconnect()
         {
