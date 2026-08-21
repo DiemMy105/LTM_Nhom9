@@ -13,7 +13,6 @@ namespace ChatTCP.Client.Network
         private TcpClient? client;
         private NetworkStream? stream;
         private Thread? receiveThread;
-
         public bool IsConnected
         {
             get
@@ -49,11 +48,11 @@ namespace ChatTCP.Client.Network
                 return;
             try
             {
+                // Serialize đã tự động thêm \n ở cuối
                 string data = MessageParser.Serialize(message);
-                // Thêm ký tự xuống dòng để đánh dấu kết thúc message
-                data += "\n";
-                byte[] bytes = Encoding.UTF8.GetBytes(data);
+                if (string.IsNullOrEmpty(data)) return;
 
+                byte[] bytes = Encoding.UTF8.GetBytes(data);
                 stream.Write(bytes, 0, bytes.Length);
             }
             catch
@@ -76,12 +75,8 @@ namespace ChatTCP.Client.Network
                     int bytesRead = stream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0)
                         break;
-                    receivedData += Encoding.UTF8.GetString(
-                        buffer,
-                        0,
-                        bytesRead
-                    );
-                    // Một lần nhận có thể có nhiều Message
+                    receivedData += Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    // Đọc từng dòng JSON dựa vào ký tự \n
                     while (receivedData.Contains("\n"))
                     {
                         int index = receivedData.IndexOf("\n");
@@ -89,8 +84,11 @@ namespace ChatTCP.Client.Network
                         receivedData = receivedData.Substring(index + 1);
                         if (string.IsNullOrWhiteSpace(data))
                             continue;
-                        Message message = MessageParser.Deserialize(data);
-                        MessageReceived?.Invoke(message);
+                        Message? message = MessageParser.Deserialize(data);
+                        if (message != null)
+                        {
+                            MessageReceived?.Invoke(message);
+                        }
                     }
                 }
             }
