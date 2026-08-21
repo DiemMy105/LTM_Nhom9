@@ -31,4 +31,6 @@ namespace ChatTCP.Shared.Network
                 return null;
             }
         }
+    }
+}
  
