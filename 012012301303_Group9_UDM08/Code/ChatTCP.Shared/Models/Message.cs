@@ -13,8 +13,6 @@ namespace ChatTCP.Shared.Models
         public string Content { get; set; } = string.Empty;
         public MessageType Type { get; set; } = MessageType.DirectChat;
         public DateTime Timestamp { get; set; } = DateTime.Now;
-
-        // Reply feature properties
         public int? ReplyToMessageId { get; set; }
         public string? ReplyToSenderName { get; set; }
         public string? ReplyToContent { get; set; }
