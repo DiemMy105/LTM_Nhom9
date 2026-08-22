@@ -18,14 +18,25 @@ namespace ChatTCP.Client.Services
         public event Action<Group>? GroupCreated;
         public event Action<string>? CreateGroupFailed;
 
-        public event Action<List<Group>>? GroupListReceived;
-        public event Action<string>? GroupListFailed;
+        public event Action<List<Group>>?
+            GroupListReceived;
+
+        public event Action<string>?
+            GroupListFailed;
+
+        public event Action<Message>?
+            GroupMessageReceived;
+
+        public event Action<string>?
+            GroupMessageFailed;
 
         public GroupService(
             TcpClientManager tcpClientManager,
             int currentUserId)
         {
-            this.tcpClientManager = tcpClientManager;
+            this.tcpClientManager =
+                tcpClientManager;
+
             CurrentUserId = currentUserId;
 
             this.tcpClientManager.MessageReceived
@@ -92,6 +103,46 @@ namespace ChatTCP.Client.Services
             tcpClientManager.SendMessage(message);
         }
 
+        public void SendGroupMessage(
+            int groupId,
+            string content)
+        {
+            EnsureConnected();
+
+            if (groupId <= 0)
+            {
+                throw new ArgumentException(
+                    "Mã nhóm không hợp lệ.");
+            }
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                throw new ArgumentException(
+                    "Nội dung tin nhắn không được để trống.");
+            }
+
+            string normalizedContent =
+                content.Trim();
+
+            if (normalizedContent.Length > 4000)
+            {
+                throw new ArgumentException(
+                    "Tin nhắn không được vượt quá 4000 ký tự.");
+            }
+
+            Message message = new Message
+            {
+                SenderId = CurrentUserId,
+                ReceiverId = null,
+                GroupId = groupId,
+                Content = normalizedContent,
+                Type = MessageType.GroupChat,
+                Timestamp = DateTime.Now
+            };
+
+            tcpClientManager.SendMessage(message);
+        }
+
         private void OnMessageReceived(
             Message message)
         {
@@ -103,6 +154,10 @@ namespace ChatTCP.Client.Services
 
                 case MessageType.GetGroupListResponse:
                     HandleGroupListResponse(message);
+                    break;
+
+                case MessageType.GroupChat:
+                    HandleGroupMessage(message);
                     break;
             }
         }
@@ -169,6 +224,35 @@ namespace ChatTCP.Client.Services
                 GroupListFailed?.Invoke(
                     "Không đọc được danh sách nhóm từ Server.");
             }
+        }
+
+        private void HandleGroupMessage(
+            Message message)
+        {
+            if (!message.GroupId.HasValue ||
+                message.GroupId.Value <= 0)
+            {
+                GroupMessageFailed?.Invoke(
+                    "Tin nhắn không có mã nhóm hợp lệ.");
+
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                message.Content))
+            {
+                GroupMessageFailed?.Invoke(
+                    "Tin nhắn nhóm không có nội dung.");
+
+                return;
+            }
+
+            if (message.SenderId == CurrentUserId)
+            {
+                return;
+            }
+
+            GroupMessageReceived?.Invoke(message);
         }
 
         private void EnsureConnected()
