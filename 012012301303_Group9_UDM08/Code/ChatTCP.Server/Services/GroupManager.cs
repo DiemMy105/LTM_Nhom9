@@ -10,16 +10,22 @@ namespace ChatTCP.Server.Services
 {
     public class GroupManager
     {
-        private readonly object groupLock = new object();
-        private readonly List<Group> groups = new List<Group>();
+        private readonly object groupLock =
+            new object();
+
+        private readonly List<Group> groups =
+            new List<Group>();
+
         private int nextGroupId = 1;
 
         public event Action<Group>? GroupCreated;
+        public event Action<Group>? GroupUpdated;
+        public event Action<Group>? GroupDissolved;
 
         public Group CreateGroup(
             string groupName,
             int createdBy,
-            List<int> memberIds)
+            List<int>? memberIds)
         {
             if (string.IsNullOrWhiteSpace(groupName))
             {
@@ -27,16 +33,13 @@ namespace ChatTCP.Server.Services
                     "Tên nhóm không được để trống.");
             }
 
-            if (groupName.Trim().Length > 100)
+            string normalizedName =
+                groupName.Trim();
+
+            if (normalizedName.Length > 100)
             {
                 throw new ArgumentException(
                     "Tên nhóm không được vượt quá 100 ký tự.");
-            }
-
-            if (groupName.Contains('|'))
-            {
-                throw new ArgumentException(
-                    "Tên nhóm không được chứa ký tự |.");
             }
 
             if (createdBy <= 0)
@@ -45,50 +48,262 @@ namespace ChatTCP.Server.Services
                     "Người tạo nhóm không hợp lệ.");
             }
 
-            List<int> validMemberIds = memberIds == null
-                ? new List<int>()
-                : memberIds
-                    .Where(id => id > 0)
-                    .Distinct()
-                    .ToList();
+            List<int> validMemberIds =
+                memberIds == null
+                    ? new List<int>()
+                    : memberIds
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .ToList();
 
             if (!validMemberIds.Contains(createdBy))
             {
                 validMemberIds.Add(createdBy);
             }
 
-            Group group = new Group
-            {
-                GroupName = groupName.Trim(),
-                CreatedBy = createdBy,
-                CreatedAt = DateTime.Now,
-                MemberIds = validMemberIds
-            };
+            Group storedGroup;
 
             lock (groupLock)
             {
-                group.GroupId = nextGroupId;
+                storedGroup = new Group
+                {
+                    GroupId = nextGroupId,
+                    GroupName = normalizedName,
+                    CreatedBy = createdBy,
+                    CreatedAt = DateTime.Now,
+                    MemberIds = validMemberIds
+                };
+
                 nextGroupId++;
 
-                groups.Add(group);
+                groups.Add(storedGroup);
             }
 
-            GroupCreated?.Invoke(group);
+            Group result =
+                CloneGroup(storedGroup);
 
-            return group;
+            GroupCreated?.Invoke(result);
+
+            return result;
         }
 
         public List<Group> GetGroups()
         {
             lock (groupLock)
             {
-                return groups.ToList();
+                return groups
+                    .Select(CloneGroup)
+                    .ToList();
             }
         }
 
-        public Message HandleCreateGroupRequest(Message requestMessage)
+        public List<Group> GetGroupsForUser(
+            int userId)
         {
-            if (requestMessage.Type != MessageType.CreateGroupRequest)
+            if (userId <= 0)
+            {
+                throw new ArgumentException(
+                    "Người dùng không hợp lệ.");
+            }
+
+            lock (groupLock)
+            {
+                return groups
+                    .Where(group =>
+                        group.MemberIds
+                            .Contains(userId))
+                    .Select(CloneGroup)
+                    .ToList();
+            }
+        }
+
+        public Group? GetGroupById(
+            int groupId)
+        {
+            if (groupId <= 0)
+            {
+                return null;
+            }
+
+            lock (groupLock)
+            {
+                Group? group =
+                    groups.FirstOrDefault(
+                        item =>
+                            item.GroupId == groupId);
+
+                if (group == null)
+                {
+                    return null;
+                }
+
+                return CloneGroup(group);
+            }
+        }
+
+        public List<int> GetMemberIds(
+            int groupId)
+        {
+            lock (groupLock)
+            {
+                Group group =
+                    FindGroupLocked(groupId);
+
+                return group.MemberIds.ToList();
+            }
+        }
+
+        public bool IsOwner(
+            int groupId,
+            int userId)
+        {
+            lock (groupLock)
+            {
+                Group? group =
+                    groups.FirstOrDefault(
+                        item =>
+                            item.GroupId == groupId);
+
+                return group != null &&
+                       group.IsOwner(userId);
+            }
+        }
+
+        public bool IsMember(
+            int groupId,
+            int userId)
+        {
+            lock (groupLock)
+            {
+                Group? group =
+                    groups.FirstOrDefault(
+                        item =>
+                            item.GroupId == groupId);
+
+                return group != null &&
+                       group.HasMember(userId);
+            }
+        }
+
+        public Group AddMember(
+            int groupId,
+            int requestedBy,
+            int memberId)
+        {
+            ValidateManagementIds(
+                groupId,
+                requestedBy,
+                memberId);
+
+            Group result;
+
+            lock (groupLock)
+            {
+                Group group =
+                    FindGroupLocked(groupId);
+
+                EnsureOwner(
+                    group,
+                    requestedBy);
+
+                if (group.MemberIds
+                    .Contains(memberId))
+                {
+                    throw new InvalidOperationException(
+                        "Người dùng đã là thành viên của nhóm.");
+                }
+
+                group.MemberIds.Add(memberId);
+
+                result = CloneGroup(group);
+            }
+
+            GroupUpdated?.Invoke(result);
+
+            return result;
+        }
+
+        public Group RemoveMember(
+            int groupId,
+            int requestedBy,
+            int memberId)
+        {
+            ValidateManagementIds(
+                groupId,
+                requestedBy,
+                memberId);
+
+            Group result;
+
+            lock (groupLock)
+            {
+                Group group =
+                    FindGroupLocked(groupId);
+
+                EnsureOwner(
+                    group,
+                    requestedBy);
+
+                if (group.CreatedBy == memberId)
+                {
+                    throw new InvalidOperationException(
+                        "Không thể xóa trưởng nhóm khỏi nhóm.");
+                }
+
+                bool removed =
+                    group.MemberIds.Remove(memberId);
+
+                if (!removed)
+                {
+                    throw new InvalidOperationException(
+                        "Người dùng không thuộc nhóm.");
+                }
+
+                result = CloneGroup(group);
+            }
+
+            GroupUpdated?.Invoke(result);
+
+            return result;
+        }
+
+        public Group DissolveGroup(
+            int groupId,
+            int requestedBy)
+        {
+            if (groupId <= 0 ||
+                requestedBy <= 0)
+            {
+                throw new ArgumentException(
+                    "Thông tin giải tán nhóm không hợp lệ.");
+            }
+
+            Group result;
+
+            lock (groupLock)
+            {
+                Group group =
+                    FindGroupLocked(groupId);
+
+                EnsureOwner(
+                    group,
+                    requestedBy);
+
+                result = CloneGroup(group);
+
+                groups.Remove(group);
+            }
+
+            GroupDissolved?.Invoke(result);
+
+            return result;
+        }
+
+        public Message HandleCreateGroupRequest(
+            Message requestMessage)
+        {
+            if (requestMessage.Type !=
+                MessageType.CreateGroupRequest)
             {
                 throw new ArgumentException(
                     "Tin nhắn không phải yêu cầu tạo nhóm.");
@@ -99,8 +314,9 @@ namespace ChatTCP.Server.Services
             try
             {
                 CreateGroupRequest? request =
-                    JsonSerializer.Deserialize<CreateGroupRequest>(
-                        requestMessage.Content);
+                    JsonSerializer
+                        .Deserialize<CreateGroupRequest>(
+                            requestMessage.Content);
 
                 if (request == null)
                 {
@@ -116,7 +332,10 @@ namespace ChatTCP.Server.Services
                 response = new CreateGroupResponse
                 {
                     Success = true,
-                    Message = "Tạo nhóm thành công.",
+
+                    Message =
+                        "Tạo nhóm thành công.",
+
                     Group = group
                 };
             }
@@ -134,10 +353,113 @@ namespace ChatTCP.Server.Services
             {
                 SenderId = 0,
                 SenderName = "Server",
-                ReceiverId = requestMessage.SenderId,
-                Type = MessageType.CreateGroupResponse,
-                Content = JsonSerializer.Serialize(response),
+
+                ReceiverId =
+                    requestMessage.SenderId,
+
+                Type =
+                    MessageType.CreateGroupResponse,
+
+                Content =
+                    JsonSerializer.Serialize(response),
+
                 Timestamp = DateTime.Now
+            };
+        }
+
+        public Message HandleGetGroupListRequest(
+            Message requestMessage)
+        {
+            if (requestMessage.Type !=
+                MessageType.GetGroupListRequest)
+            {
+                throw new ArgumentException(
+                    "Tin nhắn không phải yêu cầu lấy danh sách nhóm.");
+            }
+
+            List<Group> userGroups =
+                GetGroupsForUser(
+                    requestMessage.SenderId);
+
+            return new Message
+            {
+                SenderId = 0,
+                SenderName = "Server",
+
+                ReceiverId =
+                    requestMessage.SenderId,
+
+                Type =
+                    MessageType.GetGroupListResponse,
+
+                Content =
+                    JsonSerializer.Serialize(
+                        userGroups),
+
+                Timestamp = DateTime.Now
+            };
+        }
+
+        private Group FindGroupLocked(
+            int groupId)
+        {
+            if (groupId <= 0)
+            {
+                throw new ArgumentException(
+                    "Mã nhóm không hợp lệ.");
+            }
+
+            Group? group =
+                groups.FirstOrDefault(
+                    item =>
+                        item.GroupId == groupId);
+
+            if (group == null)
+            {
+                throw new KeyNotFoundException(
+                    "Không tìm thấy nhóm.");
+            }
+
+            return group;
+        }
+
+        private static void EnsureOwner(
+            Group group,
+            int requestedBy)
+        {
+            if (!group.IsOwner(requestedBy))
+            {
+                throw new UnauthorizedAccessException(
+                    "Chỉ trưởng nhóm mới được thực hiện thao tác này.");
+            }
+        }
+
+        private static void ValidateManagementIds(
+            int groupId,
+            int requestedBy,
+            int memberId)
+        {
+            if (groupId <= 0 ||
+                requestedBy <= 0 ||
+                memberId <= 0)
+            {
+                throw new ArgumentException(
+                    "Thông tin quản lý nhóm không hợp lệ.");
+            }
+        }
+
+        private static Group CloneGroup(
+            Group source)
+        {
+            return new Group
+            {
+                GroupId = source.GroupId,
+                GroupName = source.GroupName,
+                CreatedBy = source.CreatedBy,
+                CreatedAt = source.CreatedAt,
+
+                MemberIds =
+                    source.MemberIds.ToList()
             };
         }
     }
