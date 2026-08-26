@@ -163,8 +163,6 @@ namespace ChatTCP.Client.Forms
 
         private void LnkRegister_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
         {
-            // TODO: [TV1] Nên truyền chung 1 instance AuthService (dùng chung
-            // TcpClientManager) cho cả LoginForm và RegisterForm thay vì tạo service mới.
             using (var registerForm = new RegisterForm(authService))
             {
                 registerForm.ShowDialog(this);
@@ -176,10 +174,6 @@ namespace ChatTCP.Client.Forms
             RunOnUiThread(() =>
             {
                 LoggedInUser = user;
-
-                // TODO: [TV2/TV4] Truyền đủ Service thật (ChatService, EmojiService...)
-                // vào ClientForm khi các lớp đó đã sẵn sàng. GroupService demo đã được
-                // ClientForm tự khởi tạo bên trong (xem GroupService.cs).
                 var clientForm = new ClientForm(user);
                 clientForm.FormClosed += (s, args) => Close();
                 clientForm.Show();
