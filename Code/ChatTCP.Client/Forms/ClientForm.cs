@@ -1,5 +1,7 @@
+using ChatTCP.Client.Network;
 using ChatTCP.Client.Services;
 using ChatTCP.Client.UserControls;
+using ChatTCP.Client.Utils;
 using ChatTCP.Shared.Models;
 using System;
 using System.Collections.Generic;
@@ -7,56 +9,36 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using ChatMessage = ChatTCP.Shared.Models.Message;
+using ChatTCP.Shared.Enums;
 
-// Tạm thời comment các thư viện backend chưa có code
-// Khi các thành viên khác hoàn thành, bỏ comment và nối vào các điểm TODO bên dưới
-// using ChatTCP.Client.Network;
-// using ChatTCP.Shared.Enums;
-//
-// GroupService: dùng ChatTCP.Client.Services.GroupService (file thật của TV3).
-// Contract thật: TcpClientManager tcpClientManager, int CurrentUserId trong constructor;
-// event Action<Group> GroupCreated; event Action<string> CreateGroupFailed;
-// void RequestCreateGroup(string groupName, IEnumerable<int> memberIds); IDisposable.
-// (Không có event OnGroupUpdated - đã bỏ phần subscribe tương ứng.)
+
 
 namespace ChatTCP.Client.Forms
 {
     public partial class ClientForm : Form
     {
-        // Tạm thời ẩn các biến backend, sẽ khai báo thật khi có code từ các TV khác
-        // private TcpClientManager _tcpClient;    // [TV2]
-        // private ChatService _chatService;        // [TV2]
 
-        // [TV3] Khai báo sẵn, khởi tạo ở InitializeClientComponents() khi GroupService
-        // thật đã sẵn sàng. Để null cho tới lúc đó - BtnCreateGroup_Click sẽ tự chặn.
+        private TcpClientManager _tcpClient = null!;
+        private ChatService _chatService = null!;
+
         private GroupService? _groupService;
 
-        // private EmojiService _emojiService;        // [TV4] - đã có sẵn, dùng thẳng qua EmojiPickerForm
-        // private SessionManager _session;            // [TV1]
+        private EmojiService _emojiService = null!;
 
         private readonly User _currentUser;
         private readonly string _currentUsername;
         private string _activeChatTarget = "";
         private bool _activeChatIsGroup = false;
-
-        // Danh sách User đầy đủ (UserId, Username, DisplayName) đang online, dùng để
-        // truyền vào CreateGroupForm. Được đồng bộ song song với _userItems.
-        // TODO: [TV5] Khi OnUserStatusChanged(...) trả về đủ thông tin User thay vì
-        // chỉ username, thay đoạn tạo User "demo" trong AddUserToList bằng dữ liệu thật.
         private readonly Dictionary<string, User> _onlineUsersByName = new Dictionary<string, User>();
         private int _nextDemoUserId = 1;
 
-        // ==== UI Controls - Header ====
-        // Các control này thực sự được khởi tạo trong InitializeComponent() (gọi từ
-        // constructor) chứ không phải trong field initializer, nên trình biên dịch
-        // không phân tích luồng được và báo CS8618. Gán "= null!;" để xác nhận với
-        // compiler rằng field sẽ luôn được gán trước khi dùng (giống pattern Designer.cs).
+        // UI Controls - Header 
         private Panel pnlHeader = null!;
         private Label lblMyAvatar = null!;
         private Label lblMyUsername = null!;
         private Label lblMyStatus = null!;
 
-        // ==== UI Controls - Sidebar (trái) ====
+        // UI Controls - Sidebar (trái) 
         private Panel pnlSidebar = null!;
         private TabControl tabSidebar = null!;
         private TabPage tabUsers = null!;
@@ -67,7 +49,7 @@ namespace ChatTCP.Client.Forms
         private ContextMenuStrip cmsUsers = null!;
         private ToolStripMenuItem miStartChat = null!;
 
-        // ==== UI Controls - Khung chat (phải) ====
+        // UI Controls - Khung chat (phải) 
         private Panel pnlChat = null!;
         private Panel pnlChatHeader = null!;
         private Label lblChatTarget = null!;
@@ -93,7 +75,7 @@ namespace ChatTCP.Client.Forms
             InitializeClientComponents();
         }
 
-        // ================== UI SETUP ==================
+        // UI SETUP 
         private void InitializeComponent()
         {
             this.Text = "ChatTCP - Client";
@@ -102,7 +84,7 @@ namespace ChatTCP.Client.Forms
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Font = new Font("Segoe UI", 9F);
 
-            // ---- Header trên cùng ----
+            //  Header trên cùng 
             pnlHeader = new Panel
             {
                 Dock = DockStyle.Top,
@@ -143,13 +125,13 @@ namespace ChatTCP.Client.Forms
 
             pnlHeader.Controls.AddRange(new Control[] { lblMyAvatar, lblMyUsername, lblMyStatus });
 
-            // ---- Context menu cho danh sách User ----
+            // Context menu cho danh sách User 
             cmsUsers = new ContextMenuStrip();
             miStartChat = new ToolStripMenuItem("Nhắn tin");
             miStartChat.Click += MiStartChat_Click;
             cmsUsers.Items.Add(miStartChat);
 
-            // ---- Sidebar bên trái: Users / Groups ----
+            // Sidebar bên trái: Users / Groups 
             pnlSidebar = new Panel { Dock = DockStyle.Left, Width = 220 };
 
             tabSidebar = new TabControl { Dock = DockStyle.Fill };
@@ -197,7 +179,7 @@ namespace ChatTCP.Client.Forms
             pnlSidebar.Controls.Add(tabSidebar);
             pnlSidebar.Controls.Add(btnCreateGroup);
 
-            // ---- Khung chat bên phải ----
+            // Khung chat bên phải 
             pnlChat = new Panel { Dock = DockStyle.Fill };
 
             // Header của khung chat: tên người/nhóm đang chat
@@ -278,7 +260,7 @@ namespace ChatTCP.Client.Forms
             pnlChat.Controls.Add(pnlInput);
             pnlChat.Controls.Add(pnlChatHeader);
 
-            // ---- Add to form (thứ tự dock quan trọng) ----
+            // Add to form (thứ tự dock quan trọng)
             this.Controls.Add(pnlChat);
             this.Controls.Add(pnlSidebar);
             this.Controls.Add(pnlHeader);
@@ -287,31 +269,28 @@ namespace ChatTCP.Client.Forms
             this.FormClosing += ClientForm_FormClosing;
         }
 
-        // ================== LOGIC SETUP ==================
+        // LOGIC SETUP
         private void InitializeClientComponents()
         {
-            // TODO: [TV2] Khởi tạo TcpClientManager / ChatService khi các lớp đã sẵn sàng
-            // _tcpClient = new TcpClientManager();
-            // _chatService = new ChatService(_tcpClient);
-            // _chatService.OnMessageReceived += ChatService_OnMessageReceived;
+            // Thiết lập phiên đăng nhập cho người dùng hiện tại
+            SessionManager.Instance.SetCurrentUser(_currentUser);
 
-            // TODO: [TV2] Khởi tạo TcpClientManager trước, sau đó GroupService thật
-            // mới dùng được (constructor cần TcpClientManager + CurrentUserId).
-            // _tcpClient = new TcpClientManager();
-            // _groupService = new GroupService(_tcpClient, _currentUser.UserId);
-            //
-            // Lưu ý: GroupService thật KHÔNG có event OnGroupUpdated (chỉ có
-            // GroupCreated / CreateGroupFailed dùng cho luồng tạo nhóm), nên
-            // không cần subscribe gì thêm ở đây - AddGroupToList đã được gọi
-            // trực tiếp trong BtnCreateGroup_Click khi CreateGroupForm đóng lại
-            // với DialogResult.OK.
+            // Lắng nghe sự kiện khi lịch sử chat được nạp hoặc cập nhật từ Server
+            SessionManager.Instance.HistoryUpdated += OnHistoryUpdated;
 
-            // TODO: [TV4] Khởi tạo EmojiService khi lớp EmojiService.cs đã sẵn sàng
-            // _emojiService = new EmojiService();
+            //  Khởi tạo TcpClientManager / ChatService 
+            _tcpClient = new TcpClientManager();
+            _chatService = new ChatService(_tcpClient);
+            _chatService.OnMessageReceived += ChatService_OnMessageReceived;
 
-            // TODO: [TV1] Lấy danh sách User online ban đầu từ SessionManager / Server
-            // var onlineUsers = _session.GetOnlineUsers();
-            // foreach (var u in onlineUsers) AddUserToList(u.Username, u.IsOnline);
+            // Khởi tạo GroupService
+            _groupService = new GroupService(_tcpClient, _currentUser.UserId);
+
+            // Khởi tạo emoji
+            _emojiService = new EmojiService();
+
+            var onlineUsers = SessionManager.Instance.GetOnlineUsers();
+            foreach (var u in onlineUsers) AddUserToList(u.Username, string.Equals(u.Status, "Online", StringComparison.OrdinalIgnoreCase));
 
             // ---- Demo tạm thời để xem trước giao diện (xóa khi có backend thật) ----
             AddUserToList("an_nguyen", true);
@@ -320,7 +299,7 @@ namespace ChatTCP.Client.Forms
             AddGroupToList("Nhóm Đồ Án UDM08");
         }
 
-        // ================== EVENT HANDLERS - SIDEBAR ==================
+        //  EVENT HANDLERS - SIDEBAR 
         private void LvUsers_MouseDown(object? sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
@@ -342,11 +321,17 @@ namespace ChatTCP.Client.Forms
 
             lblChatTarget.Text = username;
             lblChatStatus.Text = "Chat 1-1";
-            flpMessages.Controls.Clear();
 
-            // TODO: [TV2] Tải lịch sử chat 1-1 từ ChatService/DatabaseService
-            // var history = _chatService.GetHistory(_currentUsername, username);
-            // foreach (var msg in history) AddMessageBubble(msg, msg.SenderName == _currentUsername);
+            // 1. Chuyển phiên chat sang User này và tự động gửi request lấy lịch sử từ Database Server (nếu đã kết nối TCP)
+            SessionManager.Instance.SetActiveDirectChat(username, tcpClient: _tcpClient);
+
+            // 2. Hiển thị ngay lịch sử đã có sẵn trong bộ nhớ cache
+            flpMessages.Controls.Clear();
+            var cachedHistory = SessionManager.Instance.GetDirectChatHistory(username);
+            foreach (var msg in cachedHistory)
+            {
+                AddMessageBubble(msg, msg.SenderName == _currentUsername);
+            }
         }
 
         private void OpenChatWithGroup()
@@ -359,11 +344,17 @@ namespace ChatTCP.Client.Forms
 
             lblChatTarget.Text = groupName;
             lblChatStatus.Text = "Nhóm chat";
-            flpMessages.Controls.Clear();
 
-            // TODO: [TV3] Tải lịch sử chat Group từ GroupService
-            // var history = _groupService.GetHistory(groupName);
-            // foreach (var msg in history) AddMessageBubble(msg, msg.SenderName == _currentUsername);
+            // 1. Chuyển phiên chat sang Nhóm và tự động gửi request lấy lịch sử nhóm từ Server
+            SessionManager.Instance.SetActiveGroupChat(groupName, groupId: null, tcpClient: _tcpClient);
+
+            // 2. Hiển thị ngay lịch sử nhóm đã có sẵn trong bộ nhớ cache
+            flpMessages.Controls.Clear();
+            var cachedHistory = SessionManager.Instance.GetGroupChatHistory(groupName);
+            foreach (var msg in cachedHistory)
+            {
+                AddMessageBubble(msg, msg.SenderName == _currentUsername);
+            }
         }
 
         private void BtnCreateGroup_Click(object? sender, EventArgs e)
@@ -381,14 +372,12 @@ namespace ChatTCP.Client.Forms
                 if (createGroupForm.ShowDialog(this) == DialogResult.OK
                     && createGroupForm.CreatedGroup != null)
                 {
-                    // CreateGroupForm tự gửi request và lắng nghe GroupCreated/CreateGroupFailed
-                    // qua _groupService rồi mới đóng dialog, nên ở đây chỉ cần cập nhật UI.
                     AddGroupToList(createGroupForm.CreatedGroup.GroupName);
                 }
             }
         }
 
-        // ================== EVENT HANDLERS - GỬI TIN NHẮN ==================
+        //  EVENT HANDLERS - GỬI TIN NHẮN 
         private void TxtMessage_KeyDown(object? sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter && !e.Shift)
@@ -414,16 +403,38 @@ namespace ChatTCP.Client.Forms
 
             var message = new ChatMessage
             {
+                SenderId = _currentUser.UserId,
                 SenderName = _currentUsername,
                 Content = content,
                 Timestamp = DateTime.Now
             };
 
-            // TODO: [TV2/TV3] Gửi tin nhắn thật qua ChatService (1-1) hoặc GroupService (Group)
-            // if (_activeChatIsGroup)
-            //     _groupService.SendMessage(_activeChatTarget, message);
-            // else
-            //     _chatService.SendMessage(_activeChatTarget, message);
+            if (_activeChatIsGroup)
+            {
+                message.Type = MessageType.GroupChat;
+                int? groupId = SessionManager.Instance.ActiveGroupId;
+                if (groupId.HasValue && groupId.Value > 0 && _groupService != null)
+                {
+                    message.GroupId = groupId.Value;
+                    _groupService.SendGroupMessage(groupId.Value, content);
+                }
+                else
+                {
+                    _chatService.SendMessage(message);
+                }
+            }
+            else
+            {
+                message.Type = MessageType.DirectChat;
+                if (_onlineUsersByName.TryGetValue(_activeChatTarget, out var targetUser))
+                {
+                    message.ReceiverId = targetUser.UserId;
+                }
+                _chatService.SendMessage(message);
+            }
+
+            // Lưu tin nhắn gửi đi vào SessionManager
+            SessionManager.Instance.AddMessage(message);
 
             AddMessageBubble(message, isMine: true);
             txtMessage.Clear();
@@ -446,41 +457,69 @@ namespace ChatTCP.Client.Forms
 
         private void ClientForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
+            SessionManager.Instance.HistoryUpdated -= OnHistoryUpdated;
+            if (_chatService != null)
+            {
+                _chatService.OnMessageReceived -= ChatService_OnMessageReceived;
+                _chatService.Dispose();
+            }
             _groupService?.Dispose();
 
-            // TODO: [TV2] Ngắt kết nối khỏi Server an toàn trước khi thoát
-            // _tcpClient?.Disconnect();
+            // Ngắt kết nối khỏi Server an toàn trước khi thoát
+            _tcpClient?.Disconnect();
             Application.Exit();
         }
 
-        // ================== HOOKS TÍCH HỢP BACKEND ==================
-        // Các hàm dưới đây được gọi từ backend (qua sự kiện) để cập nhật UI.
-        // Khi tích hợp thật, nối các sự kiện của TcpClientManager/ChatService/GroupService vào đây.
+        // Cập nhật lại danh sách bong bóng chat khi có dữ liệu lịch sử mới từ Server
+        private void OnHistoryUpdated(string conversationKey, IReadOnlyList<ChatMessage> messages)
+        {
+            InvokeIfRequired(() =>
+            {
+                if (conversationKey == SessionManager.Instance.GetActiveConversationKey())
+                {
+                    flpMessages.Controls.Clear();
+                    foreach (var msg in messages)
+                    {
+                        AddMessageBubble(msg, msg.SenderName == _currentUsername);
+                    }
+                }
+            });
+        }
 
-        /// <summary>
-        /// Gọi khi nhận tin nhắn mới (1-1 hoặc Group) từ Server. [Hook cho TV2/TV3]
-        /// </summary>
+
+        // Event handler khi ChatService nhận tin nhắn trực tiếp 1-1
+        private void ChatService_OnMessageReceived(ChatMessage message)
+        {
+            OnMessageReceived(message, isGroupMessage: false);
+        }
+
+        //  Gọi khi nhận tin nhắn mới (1-1 hoặc Group) từ Server. 
         public void OnMessageReceived(ChatMessage message, bool isGroupMessage)
         {
             InvokeIfRequired(() =>
             {
+                // Lưu vào SessionManager để quản lý tập trung và chống trùng lặp
+                SessionManager.Instance.AddMessage(message);
+
                 bool isCurrentChat = message.SenderName == _activeChatTarget && isGroupMessage == _activeChatIsGroup;
                 if (isCurrentChat)
                 {
                     AddMessageBubble(message, isMine: false);
                 }
 
-                // TODO: [TV4/TV5] Hiện thông báo / đánh dấu chưa đọc nếu không phải đoạn chat đang mở
+                // Hiện thông báo / đánh dấu chưa đọc nếu không phải đoạn chat đang mở
             });
         }
 
-        /// <summary>
-        /// Gọi khi trạng thái Online/Offline của 1 User thay đổi. [Hook cho TV5]
-        /// </summary>
+
+        // Gọi khi trạng thái Online/Offline của 1 User thay đổi
+
         public void OnUserStatusChanged(string username, bool isOnline)
         {
             InvokeIfRequired(() =>
             {
+                SessionManager.Instance.UpdateUserStatus(username, isOnline);
+
                 if (_userItems.TryGetValue(username, out var item))
                 {
                     UpdateUserStatus(item, isOnline);
@@ -491,16 +530,13 @@ namespace ChatTCP.Client.Forms
                 }
             });
         }
-
-        /// <summary>
-        /// Gọi khi có nhóm mới hoặc được thêm vào nhóm. [Hook cho TV3]
-        /// </summary>
+        // Gọi khi có nhóm mới hoặc được thêm vào nhóm
         public void OnGroupUpdated(string groupName)
         {
             InvokeIfRequired(() => AddGroupToList(groupName));
         }
 
-        // ================== HELPERS - SIDEBAR LIST ==================
+        // HELPERS - SIDEBAR LIST
         private void AddUserToList(string username, bool isOnline)
         {
             if (_userItems.ContainsKey(username))
@@ -516,9 +552,6 @@ namespace ChatTCP.Client.Forms
 
             if (!_onlineUsersByName.ContainsKey(username))
             {
-                // TODO: [TV5] Thay UserId/DisplayName demo dưới đây bằng dữ liệu thật
-                // ngay khi OnUserStatusChanged(...) (hoặc danh sách User ban đầu từ
-                // SessionManager) cung cấp đủ thông tin.
                 _onlineUsersByName[username] = new User
                 {
                     UserId = _nextDemoUserId++,
@@ -542,7 +575,7 @@ namespace ChatTCP.Client.Forms
             _groupItems[groupName] = item;
         }
 
-        // ================== HELPERS - CHAT BUBBLE ==================
+        // HELPERS - CHAT BUBBLE 
         private void AddMessageBubble(ChatMessage message, bool isMine)
         {
             var bubble = new ChatBubble
@@ -558,13 +591,9 @@ namespace ChatTCP.Client.Forms
             ScrollMessagesToBottom();
         }
 
-        /// <summary>
-        /// Gọi khi người dùng bấm "Trả lời" trên 1 ChatBubble. [Hook cho TV4/TV2]
-        /// </summary>
+        // Gọi khi người dùng bấm "Trả lời" trên 1 ChatBubble
         private void ChatBubble_ReplyClicked(object? sender, ChatMessage repliedMessage)
         {
-            // TODO: [TV2/TV4] Lưu repliedMessage làm ngữ cảnh Reply, hiển thị preview
-            // phía trên ô nhập tin nhắn, rồi đính kèm ReplyToMessageId khi gửi tin mới.
             MessageBox.Show(
                 $"Đang trả lời: \"{repliedMessage.Content}\"\n(Chức năng gửi kèm Reply sẽ hoàn thiện khi ChatService tích hợp.)",
                 "Trả lời tin nhắn", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -576,7 +605,7 @@ namespace ChatTCP.Client.Forms
             pnlMessages.PerformLayout();
         }
 
-        // ================== HELPERS - KHÁC ==================
+        // HELPERS - KHÁC 
         private void LayoutInputBar()
         {
             btnSend.Location = new Point(pnlInput.Width - btnSend.Width - 8, 8);
