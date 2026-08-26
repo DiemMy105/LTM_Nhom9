@@ -20,7 +20,6 @@ namespace ChatTCP.Client.Network
                 return client != null && client.Connected;
             }
         }
-        // Sự kiện khi nhận được Message
         public event Action<Message>? MessageReceived;
 
         // Kết nối Client đến Server
@@ -48,7 +47,6 @@ namespace ChatTCP.Client.Network
                 return;
             try
             {
-                // Serialize đã tự động thêm \n ở cuối
                 string data = MessageParser.Serialize(message);
                 if (string.IsNullOrEmpty(data)) return;
 
@@ -76,7 +74,6 @@ namespace ChatTCP.Client.Network
                     if (bytesRead == 0)
                         break;
                     receivedData += Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    // Đọc từng dòng JSON dựa vào ký tự \n
                     while (receivedData.Contains("\n"))
                     {
                         int index = receivedData.IndexOf("\n");
@@ -94,7 +91,6 @@ namespace ChatTCP.Client.Network
             }
             catch
             {
-                // Server ngắt kết nối
             }
         }
         // Ngắt kết nối
