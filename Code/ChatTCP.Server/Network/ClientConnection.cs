@@ -11,8 +11,11 @@ namespace ChatTCP.Server.Network
     {
         private TcpClient client;
         private NetworkStream stream;
+
         public int UserId { get; set; }
+
         public string Username { get; set; } = string.Empty;
+
         public bool IsConnected
         {
             get
@@ -20,36 +23,68 @@ namespace ChatTCP.Server.Network
                 return client != null && client.Connected;
             }
         }
-        //khi nhận được Message
+
+        public string RemoteIp { get; }
+
         public event Action<Message>? MessageReceived;
+
+        public event Action<ClientConnection>? Disconnected;
+
         public ClientConnection(TcpClient client)
         {
             this.client = client;
             stream = client.GetStream();
+
+            try
+            {
+                RemoteIp =
+                    (client.Client.RemoteEndPoint as System.Net.IPEndPoint)?
+                    .Address.ToString()
+                    ?? "N/A";
+            }
+            catch
+            {
+                RemoteIp = "N/A";
+            }
         }
-        // Bắt đầu nhận dữ liệu từ Client
+
         public void Start()
         {
             try
             {
                 byte[] buffer = new byte[4096];
                 string receivedData = "";
+
                 while (IsConnected)
                 {
-                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                    int bytesRead = stream.Read(
+                        buffer,
+                        0,
+                        buffer.Length);
+
                     if (bytesRead == 0)
                         break;
-                    receivedData += Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    // Kiểm tra và tách gói tin theo ký tự \n
+
+                    receivedData += Encoding.UTF8.GetString(
+                        buffer,
+                        0,
+                        bytesRead);
+
                     while (receivedData.Contains("\n"))
                     {
                         int index = receivedData.IndexOf("\n");
-                        string data = receivedData.Substring(0, index);
-                        receivedData = receivedData.Substring(index + 1);
+
+                        string data =
+                            receivedData.Substring(0, index);
+
+                        receivedData =
+                            receivedData.Substring(index + 1);
+
                         if (string.IsNullOrWhiteSpace(data))
                             continue;
-                        // Giữ nguyên tên hàm Deserialize theo MessageParser.cs
-                        Message? message = MessageParser.Deserialize(data);
+
+                        Message? message =
+                            MessageParser.Deserialize(data);
 
                         if (message != null)
                         {
@@ -60,29 +95,36 @@ namespace ChatTCP.Server.Network
             }
             catch
             {
-                // Client ngắt kết nối an toàn
+            }
+            finally
+            {
+                Disconnected?.Invoke(this);
             }
         }
-        // Gửi Message đến Client
+
         public void SendMessage(Message message)
         {
             try
             {
-                // Giữ nguyên tên hàm Serialize
-                string data = MessageParser.Serialize(message);
+                string data =
+                    MessageParser.Serialize(message);
 
-                if (string.IsNullOrEmpty(data)) return;
+                if (string.IsNullOrEmpty(data))
+                    return;
 
-                byte[] bytes = Encoding.UTF8.GetBytes(data);
-                stream.Write(bytes, 0, bytes.Length);
+                byte[] bytes =
+                    Encoding.UTF8.GetBytes(data);
+
+                stream.Write(
+                    bytes,
+                    0,
+                    bytes.Length);
             }
             catch
             {
-                // Xử lý lỗi gửi
             }
         }
 
-        // Đóng kết nối
         public void Disconnect()
         {
             try

@@ -1,24 +1,46 @@
 using ChatTCP.Client.Services;
 using ChatTCP.Shared.Models;
+using ChatTCP.Shared.Utils;
+
 using System;
 using System.Drawing;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ChatTCP.Client.Forms
 {
     public class LoginForm : Form
     {
+        // =========================================================
+        // AUTH SERVICE
+        // =========================================================
+
         private readonly AuthService authService;
 
-        private readonly TextBox txtUsername = new TextBox();
-        private readonly TextBox txtPassword = new TextBox();
-        private readonly CheckBox chkShowPassword = new CheckBox();
+        // =========================================================
+        // CONTROLS
+        // =========================================================
 
-        private readonly Button btnLogin = new Button();
-        private readonly LinkLabel lnkRegister = new LinkLabel();
-        private readonly Label lblStatus = new Label();
+        private TextBox txtUsername = null!;
+        private TextBox txtPassword = null!;
+
+        private CheckBox chkShowPassword = null!;
+
+        private Button btnLogin = null!;
+
+        private LinkLabel lnkRegister = null!;
+
+        private Label lblStatus = null!;
+
+        // =========================================================
+        // USER
+        // =========================================================
 
         public User? LoggedInUser { get; private set; }
+
+        // =========================================================
+        // CONSTRUCTOR
+        // =========================================================
 
         public LoginForm(AuthService authService)
         {
@@ -26,183 +48,696 @@ namespace ChatTCP.Client.Forms
 
             InitializeUi();
 
-            authService.LoginSucceeded += OnLoginSucceeded;
-            authService.LoginFailed += OnLoginFailed;
+            this.authService.LoginSucceeded +=
+                OnLoginSucceeded;
 
-            FormClosed += LoginForm_FormClosed;
+            this.authService.LoginFailed +=
+                OnLoginFailed;
+
+            FormClosed +=
+                LoginForm_FormClosed;
         }
+
+        // =========================================================
+        // INITIALIZE UI
+        // =========================================================
 
         private void InitializeUi()
         {
-            Text = "ChatTCP - Đăng nhập";
-            Size = new Size(400, 430);
-            StartPosition = FormStartPosition.CenterScreen;
-            FormBorderStyle = FormBorderStyle.FixedDialog;
+            // =====================================================
+            // FORM
+            // =====================================================
+
+            Text = "Chat TCP - Đăng nhập";
+
+            ClientSize = new Size(400, 480);
+
+            StartPosition =
+                FormStartPosition.CenterScreen;
+
+            FormBorderStyle =
+                FormBorderStyle.FixedDialog;
+
             MaximizeBox = false;
+
             MinimizeBox = false;
-            Font = new Font("Segoe UI", 9F);
 
-            Label lblTitle = new Label
-            {
-                Text = "ChatTCP",
-                Location = new Point(40, 30),
-                AutoSize = true,
-                ForeColor = Color.FromArgb(30, 90, 180),
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold)
-            };
+            ShowInTaskbar = true;
 
-            Label lblSubtitle = new Label
-            {
-                Text = "Đăng nhập để bắt đầu trò chuyện",
-                Location = new Point(42, 75),
-                AutoSize = true,
-                ForeColor = Color.Gray,
-                Font = new Font("Segoe UI", 9.5F)
-            };
+            BackColor = Color.White;
 
-            Label lblUsername = new Label
-            {
-                Text = "Tên đăng nhập:",
-                Location = new Point(40, 120),
-                AutoSize = true
-            };
+            Font =
+                new Font(
+                    "Segoe UI",
+                    9F);
 
-            txtUsername.Location = new Point(40, 143);
-            txtUsername.Size = new Size(320, 27);
-            txtUsername.MaxLength = 50;
+            // =====================================================
+            // TITLE
+            // =====================================================
 
-            Label lblPassword = new Label
-            {
-                Text = "Mật khẩu:",
-                Location = new Point(40, 185),
-                AutoSize = true
-            };
+            Label lblTitle =
+                new Label();
 
-            txtPassword.Location = new Point(40, 208);
-            txtPassword.Size = new Size(320, 27);
-            txtPassword.PasswordChar = '●';
-            txtPassword.MaxLength = 100;
+            // Đã sửa: ChatTCP -> Chat TCP
+            lblTitle.Text = "Chat TCP";
 
-            chkShowPassword.Text = "Hiện mật khẩu";
-            chkShowPassword.Location = new Point(40, 241);
-            chkShowPassword.AutoSize = true;
-            chkShowPassword.CheckedChanged += ChkShowPassword_CheckedChanged;
+            lblTitle.Location =
+                new Point(
+                    0,
+                    30);
+
+            lblTitle.Size =
+                new Size(
+                    400,
+                    50);
+
+            lblTitle.TextAlign =
+                ContentAlignment.MiddleCenter;
+
+            lblTitle.ForeColor =
+                Color.FromArgb(
+                    30,
+                    90,
+                    180);
+
+            lblTitle.Font =
+                new Font(
+                    "Segoe UI",
+                    22F,
+                    FontStyle.Bold);
+
+            // =====================================================
+            // SUBTITLE
+            // =====================================================
+
+            Label lblSubtitle =
+                new Label();
+
+            lblSubtitle.Text =
+                "Đăng nhập để bắt đầu trò chuyện";
+
+            lblSubtitle.Location =
+                new Point(
+                    0,
+                    82);
+
+            lblSubtitle.Size =
+                new Size(
+                    400,
+                    28);
+
+            lblSubtitle.TextAlign =
+                ContentAlignment.MiddleCenter;
+
+            lblSubtitle.ForeColor =
+                Color.Gray;
+
+            lblSubtitle.Font =
+                new Font(
+                    "Segoe UI",
+                    9.5F);
+
+            // =====================================================
+            // USERNAME LABEL
+            // =====================================================
+
+            Label lblUsername =
+                new Label();
+
+            lblUsername.Text =
+                "Tên đăng nhập:";
+
+            lblUsername.Location =
+                new Point(
+                    45,
+                    125);
+
+            lblUsername.Size =
+                new Size(
+                    310,
+                    24);
+
+            lblUsername.Font =
+                new Font(
+                    "Segoe UI",
+                    9F);
+
+            // =====================================================
+            // USERNAME TEXTBOX
+            // =====================================================
+
+            txtUsername =
+                new TextBox();
+
+            txtUsername.Location =
+                new Point(
+                    45,
+                    150);
+
+            txtUsername.Size =
+                new Size(
+                    310,
+                    30);
+
+            txtUsername.MaxLength =
+                50;
+
+            txtUsername.Font =
+                new Font(
+                    "Segoe UI",
+                    10F);
+
+            // =====================================================
+            // PASSWORD LABEL
+            // =====================================================
+
+            Label lblPassword =
+                new Label();
+
+            lblPassword.Text =
+                "Mật khẩu:";
+
+            lblPassword.Location =
+                new Point(
+                    45,
+                    195);
+
+            lblPassword.Size =
+                new Size(
+                    310,
+                    24);
+
+            lblPassword.Font =
+                new Font(
+                    "Segoe UI",
+                    9F);
+
+            // =====================================================
+            // PASSWORD TEXTBOX
+            // =====================================================
+
+            txtPassword =
+                new TextBox();
+
+            txtPassword.Location =
+                new Point(
+                    45,
+                    220);
+
+            txtPassword.Size =
+                new Size(
+                    310,
+                    30);
+
+            txtPassword.MaxLength =
+                100;
+
+            // Ẩn mật khẩu mặc định
+            txtPassword.UseSystemPasswordChar =
+                true;
+
+            txtPassword.Font =
+                new Font(
+                    "Segoe UI",
+                    10F);
+
+            // =====================================================
+            // SHOW PASSWORD
+            // =====================================================
+
+            chkShowPassword =
+                new CheckBox();
+
+            // Đã sửa thành đầy đủ
+            chkShowPassword.Text =
+                "Hiện mật khẩu";
+
+            chkShowPassword.Location =
+                new Point(
+                    45,
+                    260);
+
+            // Cho tự động giãn theo chữ
+            chkShowPassword.AutoSize =
+                true;
+
+            chkShowPassword.Font =
+                new Font(
+                    "Segoe UI",
+                    9F);
+
+            chkShowPassword.Margin =
+                new Padding(0);
+
+            chkShowPassword.Padding =
+                new Padding(0);
+
+            chkShowPassword.Cursor =
+                Cursors.Hand;
+
+            chkShowPassword.CheckedChanged +=
+                ChkShowPassword_CheckedChanged;
+
+            // =====================================================
+            // STATUS
+            // =====================================================
+
+            lblStatus =
+                new Label();
 
             lblStatus.Text = "";
-            lblStatus.Location = new Point(40, 270);
-            lblStatus.Size = new Size(320, 20);
-            lblStatus.ForeColor = Color.IndianRed;
-            lblStatus.Font = new Font("Segoe UI", 8.5F);
 
-            btnLogin.Text = "Đăng nhập";
-            btnLogin.Location = new Point(40, 300);
-            btnLogin.Size = new Size(320, 38);
-            btnLogin.BackColor = Color.FromArgb(30, 90, 180);
-            btnLogin.ForeColor = Color.White;
-            btnLogin.FlatStyle = FlatStyle.Flat;
-            btnLogin.FlatAppearance.BorderSize = 0;
-            btnLogin.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnLogin.Click += BtnLogin_Click;
+            lblStatus.Location =
+                new Point(
+                    45,
+                    290);
 
-            lnkRegister.Text = "Chưa có tài khoản? Đăng ký ngay";
-            lnkRegister.Location = new Point(85, 350);
-            lnkRegister.AutoSize = true;
-            lnkRegister.LinkClicked += LnkRegister_LinkClicked;
+            lblStatus.Size =
+                new Size(
+                    310,
+                    30);
+
+            lblStatus.TextAlign =
+                ContentAlignment.MiddleLeft;
+
+            lblStatus.ForeColor =
+                Color.IndianRed;
+
+            lblStatus.Font =
+                new Font(
+                    "Segoe UI",
+                    8.5F);
+
+            // =====================================================
+            // LOGIN BUTTON
+            // =====================================================
+
+            btnLogin =
+                new Button();
+
+            btnLogin.Text =
+                "Đăng nhập";
+
+            btnLogin.Location =
+                new Point(
+                    45,
+                    330);
+
+            btnLogin.Size =
+                new Size(
+                    310,
+                    40);
+
+            btnLogin.BackColor =
+                Color.FromArgb(
+                    30,
+                    90,
+                    180);
+
+            btnLogin.ForeColor =
+                Color.White;
+
+            btnLogin.FlatStyle =
+                FlatStyle.Flat;
+
+            btnLogin.FlatAppearance.BorderSize =
+                0;
+
+            btnLogin.Font =
+                new Font(
+                    "Segoe UI",
+                    10F,
+                    FontStyle.Bold);
+
+            btnLogin.Cursor =
+                Cursors.Hand;
+
+            btnLogin.UseVisualStyleBackColor =
+                false;
+
+            btnLogin.Click +=
+                BtnLogin_Click;
+
+            // =====================================================
+            // REGISTER LINK
+            // =====================================================
+
+            lnkRegister =
+                new LinkLabel();
+
+            lnkRegister.Text =
+                "Chưa có tài khoản? Đăng ký ngay";
+
+            lnkRegister.Location =
+                new Point(
+                    0,
+                    390);
+
+            lnkRegister.Size =
+                new Size(
+                    400,
+                    30);
+
+            lnkRegister.TextAlign =
+                ContentAlignment.MiddleCenter;
+
+            lnkRegister.Font =
+                new Font(
+                    "Segoe UI",
+                    9F);
+
+            lnkRegister.LinkColor =
+                Color.FromArgb(
+                    30,
+                    90,
+                    180);
+
+            lnkRegister.Cursor =
+                Cursors.Hand;
+
+            lnkRegister.LinkClicked +=
+                LnkRegister_LinkClicked;
+
+            // =====================================================
+            // ADD CONTROLS
+            // =====================================================
 
             Controls.Add(lblTitle);
+
             Controls.Add(lblSubtitle);
+
             Controls.Add(lblUsername);
+
             Controls.Add(txtUsername);
+
             Controls.Add(lblPassword);
+
             Controls.Add(txtPassword);
+
             Controls.Add(chkShowPassword);
+
             Controls.Add(lblStatus);
+
             Controls.Add(btnLogin);
+
             Controls.Add(lnkRegister);
 
-            AcceptButton = btnLogin;
+            // =====================================================
+            // ENTER ĐỂ ĐĂNG NHẬP
+            // =====================================================
+
+            AcceptButton =
+                btnLogin;
+
+            txtPassword.KeyDown +=
+                TxtPassword_KeyDown;
         }
 
-        private void ChkShowPassword_CheckedChanged(object? sender, EventArgs e)
+        // =========================================================
+        // HIỆN / ẨN MẬT KHẨU
+        // =========================================================
+
+        private void ChkShowPassword_CheckedChanged(
+            object? sender,
+            EventArgs e)
         {
-            txtPassword.PasswordChar = chkShowPassword.Checked ? '\0' : '●';
+            if (chkShowPassword.Checked)
+            {
+                // Hiện mật khẩu
+                txtPassword.UseSystemPasswordChar =
+                    false;
+            }
+            else
+            {
+                // Ẩn mật khẩu
+                txtPassword.UseSystemPasswordChar =
+                    true;
+            }
         }
 
-        private void BtnLogin_Click(object? sender, EventArgs e)
+        // =========================================================
+        // ENTER ĐỂ ĐĂNG NHẬP
+        // =========================================================
+
+        private void TxtPassword_KeyDown(
+            object? sender,
+            KeyEventArgs e)
         {
-            string username = txtUsername.Text.Trim();
-            string password = txtPassword.Text;
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+
+                BtnLogin_Click(
+                    btnLogin,
+                    EventArgs.Empty);
+            }
+        }
+
+        // =========================================================
+        // LOGIN
+        // =========================================================
+
+        private async void BtnLogin_Click(
+            object? sender,
+            EventArgs e)
+        {
+            string username =
+                txtUsername.Text.Trim();
+
+            string password =
+                txtPassword.Text;
+
+            // -----------------------------------------------------
+            // USERNAME
+            // -----------------------------------------------------
 
             if (string.IsNullOrWhiteSpace(username))
             {
-                ShowStatus("Vui lòng nhập tên đăng nhập.");
+                ShowStatus(
+                    "Vui lòng nhập tên đăng nhập.");
+
                 txtUsername.Focus();
+
                 return;
             }
+
+            // -----------------------------------------------------
+            // PASSWORD
+            // -----------------------------------------------------
 
             if (string.IsNullOrWhiteSpace(password))
             {
-                ShowStatus("Vui lòng nhập mật khẩu.");
+                ShowStatus(
+                    "Vui lòng nhập mật khẩu.");
+
                 txtPassword.Focus();
+
                 return;
             }
 
+            btnLogin.Enabled =
+                false;
+
             try
             {
-                btnLogin.Enabled = false;
-                ShowStatus("Đang kết nối tới Server...", isError: false);
+                // -------------------------------------------------
+                // KẾT NỐI SERVER
+                // -------------------------------------------------
 
-                authService.RequestLogin(username, password);
+                bool connected =
+                    await EnsureConnectedAsync();
+
+                if (!connected)
+                {
+                    ShowStatus(
+                        "Không thể kết nối tới Server. " +
+                        "Kiểm tra lại IP/Port.");
+
+                    btnLogin.Enabled =
+                        true;
+
+                    return;
+                }
+
+                // -------------------------------------------------
+                // LOGIN
+                // -------------------------------------------------
+
+                ShowStatus(
+                    "Đang đăng nhập...",
+                    false);
+
+                authService.RequestLogin(
+                    username,
+                    password);
             }
             catch (Exception ex)
             {
-                btnLogin.Enabled = true;
-                ShowStatus(ex.Message);
+                ShowStatus(
+                    ex.Message);
+
+                btnLogin.Enabled =
+                    true;
             }
         }
 
-        private void LnkRegister_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
+        // =========================================================
+        // REGISTER
+        // =========================================================
+
+        private async void LnkRegister_LinkClicked(
+            object? sender,
+            LinkLabelLinkClickedEventArgs e)
         {
-            using (var registerForm = new RegisterForm(authService))
+            lnkRegister.Enabled =
+                false;
+
+            ShowStatus(
+                "Đang kết nối tới Server...",
+                false);
+
+            try
             {
-                registerForm.ShowDialog(this);
+                bool connected =
+                    await EnsureConnectedAsync();
+
+                if (!connected)
+                {
+                    ShowStatus(
+                        "Không thể kết nối tới Server. " +
+                        "Kiểm tra lại IP/Port.");
+
+                    return;
+                }
+
+                ShowStatus("");
+
+                using (
+                    var registerForm =
+                        new RegisterForm(
+                            authService))
+                {
+                    registerForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowStatus(
+                    ex.Message);
+            }
+            finally
+            {
+                lnkRegister.Enabled =
+                    true;
             }
         }
 
-        private void OnLoginSucceeded(User user)
+        // =========================================================
+        // ENSURE CONNECTION
+        // =========================================================
+
+        private async Task<bool> EnsureConnectedAsync()
+        {
+            if (authService.IsConnected)
+            {
+                return true;
+            }
+
+            ShowStatus(
+                "Đang kết nối tới Server...",
+                false);
+
+            return await Task.Run(
+                () =>
+                    authService.Connect(
+                        NetworkConfig.ServerIp,
+                        NetworkConfig.ServerPort));
+        }
+
+        // =========================================================
+        // LOGIN SUCCESS
+        // =========================================================
+
+        private void OnLoginSucceeded(
+            User user)
         {
             RunOnUiThread(() =>
             {
-                LoggedInUser = user;
-                var clientForm = new ClientForm(user);
-                clientForm.FormClosed += (s, args) => Close();
+                LoggedInUser =
+                    user;
+
+                var clientForm =
+                    new ClientForm(
+                        user,
+                        authService.Connection);
+
+                clientForm.FormClosed +=
+                    (s, args) =>
+                    {
+                        Close();
+                    };
+
                 clientForm.Show();
+
                 Hide();
             });
         }
 
-        private void OnLoginFailed(string errorMessage)
+        // =========================================================
+        // LOGIN FAILED
+        // =========================================================
+
+        private void OnLoginFailed(
+            string errorMessage)
         {
             RunOnUiThread(() =>
             {
-                btnLogin.Enabled = true;
-                ShowStatus(errorMessage);
+                btnLogin.Enabled =
+                    true;
+
+                ShowStatus(
+                    errorMessage);
             });
         }
 
-        private void LoginForm_FormClosed(object? sender, FormClosedEventArgs e)
+        // =========================================================
+        // FORM CLOSED
+        // =========================================================
+
+        private void LoginForm_FormClosed(
+            object? sender,
+            FormClosedEventArgs e)
         {
-            authService.LoginSucceeded -= OnLoginSucceeded;
-            authService.LoginFailed -= OnLoginFailed;
+            authService.LoginSucceeded -=
+                OnLoginSucceeded;
+
+            authService.LoginFailed -=
+                OnLoginFailed;
         }
 
-        private void ShowStatus(string message, bool isError = true)
+        // =========================================================
+        // STATUS
+        // =========================================================
+
+        private void ShowStatus(
+            string message,
+            bool isError = true)
         {
-            lblStatus.Text = message;
-            lblStatus.ForeColor = isError ? Color.IndianRed : Color.SteelBlue;
+            lblStatus.Text =
+                message;
+
+            lblStatus.ForeColor =
+                isError
+                    ? Color.IndianRed
+                    : Color.SteelBlue;
         }
 
-        private void RunOnUiThread(Action action)
+        // =========================================================
+        // UI THREAD
+        // =========================================================
+
+        private void RunOnUiThread(
+            Action action)
         {
             if (InvokeRequired)
             {
