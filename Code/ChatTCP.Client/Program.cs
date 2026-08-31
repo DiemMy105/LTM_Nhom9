@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Windows.Forms;
 using ChatTCP.Client.Forms;
+using ChatTCP.Client.Network;
 using ChatTCP.Client.Services;
 
 namespace ChatTCP.Client
@@ -20,7 +21,9 @@ namespace ChatTCP.Client
 
             try
             {
-                var authService = new AuthService();
+             
+                var tcpClientManager = new TcpClientManager();
+                var authService = new AuthService(tcpClientManager);
 
                 // Chạy LoginForm: Khi đăng nhập thành công, LoginForm sẽ tự mở ClientForm
                 Application.Run(new LoginForm(authService));
