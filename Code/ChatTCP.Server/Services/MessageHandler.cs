@@ -92,30 +92,40 @@ namespace ChatTCP.Server.Services
             }
         }
 
-        // Xử lý đăng nhập tài khoản
         private void HandleLogin(Message msg, ClientConnection client)
         {
             string username = msg.SenderName;
             string password = msg.Content;
 
-            // Đọc dữ liệu User nếu client gửi JSON trong Content
-            if (string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(msg.Content))
+            if (!string.IsNullOrWhiteSpace(msg.Content) && msg.Content.TrimStart().StartsWith("{"))
             {
                 try
                 {
-                    var userObj = JsonSerializer.Deserialize<User>(msg.Content);
-                    if (userObj != null)
+                    var loginData = JsonSerializer.Deserialize<LoginRequestData>(msg.Content);
+                    if (loginData != null)
                     {
-                        username = userObj.Username;
-                        password = userObj.Password;
+                        if (!string.IsNullOrWhiteSpace(loginData.Username))
+                        {
+                            username = loginData.Username;
+                        }
+                        password = loginData.Password;
                     }
                 }
-                catch { }
+                catch
+                {
+                 
+                }
             }
 
             // Kiểm tra thông tin với CSDL
             User? user = _dbService.LoginUser(username, password, out string errorMessage);
             bool isSuccess = (user != null);
+            var responseData = new LoginResponseData
+            {
+                Success = isSuccess,
+                Message = isSuccess ? "Đăng nhập thành công" : (string.IsNullOrEmpty(errorMessage) ? "Đăng nhập thất bại" : errorMessage),
+                User = isSuccess ? user : null
+            };
 
             Message response = new Message
             {
@@ -123,7 +133,7 @@ namespace ChatTCP.Server.Services
                 SenderName = "Server",
                 ReceiverId = isSuccess ? user!.UserId : null,
                 Type = MessageType.LoginResponse,
-                Content = isSuccess ? "Đăng nhập thành công" : (string.IsNullOrEmpty(errorMessage) ? "Đăng nhập thất bại" : errorMessage),
+                Content = JsonSerializer.Serialize(responseData),
                 Timestamp = DateTime.Now
             };
 
@@ -180,13 +190,20 @@ namespace ChatTCP.Server.Services
             User? registeredUser = _dbService.RegisterUser(newUser, out string errorMessage);
             bool isSuccess = (registeredUser != null);
 
+            var responseData = new RegisterResponseData
+            {
+                Success = isSuccess,
+                Message = isSuccess ? "Đăng ký tài khoản thành công" : (string.IsNullOrEmpty(errorMessage) ? "Đăng ký thất bại" : errorMessage),
+                User = isSuccess ? registeredUser : null
+            };
+
             Message response = new Message
             {
                 SenderId = 0,
                 SenderName = "Server",
                 ReceiverId = isSuccess ? registeredUser!.UserId : null,
                 Type = MessageType.RegisterResponse,
-                Content = isSuccess ? "Đăng ký tài khoản thành công" : (string.IsNullOrEmpty(errorMessage) ? "Đăng ký thất bại" : errorMessage),
+                Content = JsonSerializer.Serialize(responseData),
                 Timestamp = DateTime.Now
             };
 
@@ -289,6 +306,26 @@ namespace ChatTCP.Server.Services
             {
                 Console.WriteLine($"[MessageHandler] Lỗi lấy danh sách nhóm: {ex.Message}");
             }
+        }
+
+        private class LoginRequestData
+        {
+            public string Username { get; set; } = string.Empty;
+            public string Password { get; set; } = string.Empty;
+        }
+
+        private class LoginResponseData
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; } = string.Empty;
+            public User? User { get; set; }
+        }
+
+        private class RegisterResponseData
+        {
+            public bool Success { get; set; }
+            public string Message { get; set; } = string.Empty;
+            public User? User { get; set; }
         }
     }
 }
