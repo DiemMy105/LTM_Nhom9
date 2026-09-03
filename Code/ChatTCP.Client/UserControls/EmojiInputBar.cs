@@ -49,17 +49,27 @@ namespace ChatTCP.Client.UserControls
             this.Controls.Add(btnSend);
         }
 
+        private EmojiPickerForm? _picker;
+
         private void BtnEmoji_Click(object? sender, EventArgs e)
         {
-            using (var picker = new EmojiPickerForm())
+            if (_picker != null && !_picker.IsDisposed && _picker.Visible)
             {
-                Point location = btnEmoji.PointToScreen(new Point(0, -picker.Height));
-                picker.Location = location;
-                if (picker.ShowDialog() == DialogResult.OK && picker.SelectedEmoji != null)
-                {
-                    txtInput.AppendText(picker.SelectedEmoji);
-                }
+                _picker.Close();
+                _picker = null;
+                return;
             }
+
+            _picker = new EmojiPickerForm();
+            Point location = btnEmoji.PointToScreen(new Point(0, -_picker.Height - 4));
+            _picker.Location = location;
+            _picker.EmojiSelected += (emoji) =>
+            {
+                txtInput.AppendText(emoji);
+                txtInput.Focus();
+            };
+            _picker.FormClosed += (s, ev) => _picker = null;
+            _picker.Show(this);
         }
     }
 }

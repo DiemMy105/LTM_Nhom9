@@ -18,13 +18,13 @@ namespace ChatTCP.Server
         [STAThread]
         static void Main()
         {
-            // ---- Bắt các lỗi không xử lý được (Unhandled Exceptions) ----
+            // Bắt các lỗi không xử lý được (Unhandled Exceptions)
             // Tránh Server bị crash im lặng khi có lỗi ngoài dự tính
             // (ví dụ: lỗi mất kết nối Database, lỗi Socket...).
             Application.ThreadException += Application_ThreadException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
-            // ---- Khởi tạo cấu hình WinForms ----
+            // Khởi tạo cấu hình WinForms
             ApplicationConfiguration.Initialize();
 
             try

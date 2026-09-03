@@ -4,7 +4,6 @@ using ChatTCP.Client.UserControls;
 using ChatTCP.Client.Utils;
 using ChatTCP.Shared.Enums;
 using ChatTCP.Shared.Models;
-
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -19,39 +18,35 @@ namespace ChatTCP.Client.Forms
 {
     public partial class ClientForm : Form
     {
-        // =========================================================
         // NETWORK / SERVICES
-        // =========================================================
-
         private TcpClientManager _tcpClient = null!;
         private ChatService _chatService = null!;
         private GroupService? _groupService;
         private EmojiService _emojiService = null!;
 
-        // =========================================================
         // CURRENT USER
-        // =========================================================
-
         private readonly User _currentUser;
         private readonly string _currentUsername;
+
+        public bool IsLoggingOut { get; private set; } = false;
 
         private string _activeChatTarget = "";
         private bool _activeChatIsGroup = false;
 
-        // =========================================================
         // USERS / GROUPS
-        // =========================================================
-
         private readonly Dictionary<string, User>
             _onlineUsersByName =
                 new Dictionary<string, User>();
 
+        private readonly Dictionary<string, Group>
+            _groupsByName =
+                new Dictionary<string, Group>();
+
+        private ChatMessage? _activeReplyMessage;
+
         private int _nextDemoUserId = 1;
 
-        // =========================================================
         // HEADER
-        // =========================================================
-
         private Panel pnlHeader = null!;
 
         private PictureBox picMyAvatar = null!;
@@ -59,10 +54,7 @@ namespace ChatTCP.Client.Forms
         private Label lblMyStatus = null!;
         private Button btnLogout = null!;
 
-        // =========================================================
         // SIDEBAR
-        // =========================================================
-
         private Panel pnlSidebar = null!;
         private TabControl tabSidebar = null!;
         private TabPage tabUsers = null!;
@@ -76,10 +68,7 @@ namespace ChatTCP.Client.Forms
         private ContextMenuStrip cmsUsers = null!;
         private ToolStripMenuItem miStartChat = null!;
 
-        // =========================================================
         // CHAT
-        // =========================================================
-
         private Panel pnlChat = null!;
 
         private Panel pnlChatHeader = null!;
@@ -91,23 +80,21 @@ namespace ChatTCP.Client.Forms
         private Panel pnlMessages = null!;
         private FlowLayoutPanel flpMessages = null!;
 
+        private Panel pnlReplyPreview = null!;
+        private Label lblReplyPreview = null!;
+        private Button btnCancelReply = null!;
+
         private Panel pnlInput = null!;
 
         private Button btnEmoji = null!;
         private TextBox txtMessage = null!;
         private Button btnSend = null!;
 
-        // =========================================================
         // EMOJI
-        // =========================================================
-
         private Panel pnlEmoji = null!;
         private EmojiPickerForm? _emojiPicker;
 
-        // =========================================================
         // ITEM REFERENCES
-        // =========================================================
-
         private readonly Dictionary<string, ListViewItem>
             _userItems =
                 new Dictionary<string, ListViewItem>();
@@ -116,16 +103,11 @@ namespace ChatTCP.Client.Forms
             _groupItems =
                 new Dictionary<string, ListViewItem>();
 
-        // =========================================================
-        // AVATAR
-        // =========================================================
-
+        // AVATAR & CHAT STATE
         private Image? _defaultAvatar;
+        private DateTime? _lastRenderedDate = null;
 
-        // =========================================================
         // CONSTRUCTOR
-        // =========================================================
-
         public ClientForm(
             User currentUser,
             TcpClientManager tcpClient)
@@ -141,10 +123,7 @@ namespace ChatTCP.Client.Forms
                 tcpClient);
         }
 
-        // =========================================================
         // UI SETUP
-        // =========================================================
-
         private void InitializeComponent()
         {
             Text = "ChatTCP - Client";
@@ -162,18 +141,12 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     9F);
 
-            // =====================================================
             // LOAD AVATAR
-            // =====================================================
-
             _defaultAvatar =
                 LoadAvatar(_currentUser.Avatar)
                 ?? LoadAvatar("avt1.png");
 
-            // =====================================================
             // HEADER
-            // =====================================================
-
             pnlHeader =
                 new Panel
                 {
@@ -195,10 +168,7 @@ namespace ChatTCP.Client.Forms
                             0)
                 };
 
-            // -----------------------------------------------------
             // MY AVATAR
-            // -----------------------------------------------------
-
             picMyAvatar =
                 new PictureBox
                 {
@@ -232,10 +202,7 @@ namespace ChatTCP.Client.Forms
             MakeCircle(
                 picMyAvatar);
 
-            // -----------------------------------------------------
             // MY USERNAME
-            // -----------------------------------------------------
-
             lblMyUsername =
                 new Label
                 {
@@ -259,10 +226,7 @@ namespace ChatTCP.Client.Forms
                             FontStyle.Bold)
                 };
 
-            // -----------------------------------------------------
             // ONLINE STATUS
-            // -----------------------------------------------------
-
             lblMyStatus =
                 new Label
                 {
@@ -288,10 +252,7 @@ namespace ChatTCP.Client.Forms
                             8F)
                 };
 
-            // -----------------------------------------------------
             // LOGOUT BUTTON
-            // -----------------------------------------------------
-
             btnLogout =
                 new Button
                 {
@@ -351,10 +312,8 @@ namespace ChatTCP.Client.Forms
                     btnLogout
                 });
 
-            // =====================================================
-            // CONTEXT MENU
-            // =====================================================
 
+            // CONTEXT MENU
             cmsUsers =
                 new ContextMenuStrip();
 
@@ -368,10 +327,7 @@ namespace ChatTCP.Client.Forms
             cmsUsers.Items.Add(
                 miStartChat);
 
-            // =====================================================
             // SIDEBAR
-            // =====================================================
-
             pnlSidebar =
                 new Panel
                 {
@@ -390,9 +346,7 @@ namespace ChatTCP.Client.Forms
                         DockStyle.Fill
                 };
 
-            // =====================================================
             // USERS TAB
-            // =====================================================
 
             tabUsers =
                 new TabPage(
@@ -434,9 +388,7 @@ namespace ChatTCP.Client.Forms
             tabUsers.Controls.Add(
                 lvUsers);
 
-            // =====================================================
             // GROUPS TAB
-            // =====================================================
 
             tabGroups =
                 new TabPage(
@@ -478,10 +430,7 @@ namespace ChatTCP.Client.Forms
             tabSidebar.TabPages.Add(
                 tabGroups);
 
-            // =====================================================
             // CREATE GROUP BUTTON
-            // =====================================================
-
             btnCreateGroup =
                 new Button
                 {
@@ -510,10 +459,7 @@ namespace ChatTCP.Client.Forms
             pnlSidebar.Controls.Add(
                 btnCreateGroup);
 
-            // =====================================================
             // CHAT PANEL
-            // =====================================================
-
             pnlChat =
                 new Panel
                 {
@@ -524,10 +470,7 @@ namespace ChatTCP.Client.Forms
                         Color.White
                 };
 
-            // =====================================================
             // CHAT HEADER
-            // =====================================================
-
             pnlChatHeader =
                 new Panel
                 {
@@ -548,9 +491,7 @@ namespace ChatTCP.Client.Forms
                             0)
                 };
 
-            // -----------------------------------------------------
             // CHAT AVATAR
-            // -----------------------------------------------------
 
             picChatAvatar =
                 new PictureBox
@@ -585,10 +526,7 @@ namespace ChatTCP.Client.Forms
             MakeCircle(
                 picChatAvatar);
 
-            // -----------------------------------------------------
             // CHAT TARGET
-            // -----------------------------------------------------
-
             lblChatTarget =
                 new Label
                 {
@@ -620,9 +558,7 @@ namespace ChatTCP.Client.Forms
                             35)
                 };
 
-            // -----------------------------------------------------
             // CHAT STATUS
-            // -----------------------------------------------------
 
             lblChatStatus =
                 new Label
@@ -654,9 +590,7 @@ namespace ChatTCP.Client.Forms
                     lblChatStatus
                 });
 
-            // =====================================================
             // MESSAGE PANEL
-            // =====================================================
 
             pnlMessages =
                 new Panel
@@ -707,9 +641,7 @@ namespace ChatTCP.Client.Forms
             pnlMessages.Controls.Add(
                 flpMessages);
 
-            // =====================================================
             // INPUT PANEL
-            // =====================================================
 
             pnlInput =
                 new Panel
@@ -728,9 +660,7 @@ namespace ChatTCP.Client.Forms
                         Color.White
                 };
 
-            // -----------------------------------------------------
             // EMOJI BUTTON
-            // -----------------------------------------------------
 
             btnEmoji =
                 new Button
@@ -778,9 +708,7 @@ namespace ChatTCP.Client.Forms
             btnEmoji.Click +=
                 BtnEmoji_Click;
 
-            // -----------------------------------------------------
             // SEND BUTTON
-            // -----------------------------------------------------
 
             btnSend =
                 new Button
@@ -810,9 +738,7 @@ namespace ChatTCP.Client.Forms
             btnSend.Click +=
                 BtnSend_Click;
 
-            // -----------------------------------------------------
             // MESSAGE BOX
-            // -----------------------------------------------------
 
             txtMessage =
                 new TextBox
@@ -852,9 +778,123 @@ namespace ChatTCP.Client.Forms
                 (s, e) =>
                     LayoutInputBar();
 
-            // =====================================================
+            // REPLY PREVIEW PANEL
+
+            pnlReplyPreview =
+                new Panel
+                {
+                    Dock =
+                        DockStyle.Bottom,
+
+                    Height =
+                        32,
+
+                    BackColor =
+                        Color.FromArgb(
+                            245,
+                            247,
+                            250),
+
+                    Padding =
+                        new Padding(
+                            10,
+                            4,
+                            10,
+                            4),
+
+                    Visible =
+                        false
+                };
+
+            lblReplyPreview =
+                new Label
+                {
+                    Location =
+                        new Point(
+                            10,
+                            6),
+
+                    AutoSize =
+                        true,
+
+                    Font =
+                        new Font(
+                            "Segoe UI",
+                            9F,
+                            FontStyle.Italic),
+
+                    ForeColor =
+                        Color.FromArgb(
+                            70,
+                            70,
+                            70),
+
+                    Text =
+                        "↩ Trả lời:"
+                };
+
+            btnCancelReply =
+                new Button
+                {
+                    Text =
+                        "✕",
+
+                    Size =
+                        new Size(
+                            24,
+                            24),
+
+                    Anchor =
+                        AnchorStyles.Top |
+                        AnchorStyles.Right,
+
+                    FlatStyle =
+                        FlatStyle.Flat,
+
+                    ForeColor =
+                        Color.DimGray,
+
+                    Cursor =
+                        Cursors.Hand,
+
+                    Font =
+                        new Font(
+                            "Segoe UI",
+                            8.5F,
+                            FontStyle.Bold)
+                };
+
+            btnCancelReply.FlatAppearance.BorderSize = 0;
+            btnCancelReply.Click +=
+                BtnCancelReply_Click;
+
+            pnlReplyPreview.Controls.Add(
+                lblReplyPreview);
+
+            pnlReplyPreview.Controls.Add(
+                btnCancelReply);
+
+            pnlReplyPreview.Resize +=
+                (s, e) =>
+                {
+                    btnCancelReply.Location =
+                        new Point(
+                            pnlReplyPreview.Width -
+                            btnCancelReply.Width -
+                            8,
+                            4);
+
+                    lblReplyPreview.MaximumSize =
+                        new Size(
+                            Math.Max(
+                                50,
+                                btnCancelReply.Left -
+                                lblReplyPreview.Left -
+                                10),
+                            24);
+                };
+
             // EMOJI PANEL
-            // =====================================================
 
             pnlEmoji =
                 new Panel
@@ -875,15 +915,16 @@ namespace ChatTCP.Client.Forms
                         BorderStyle.FixedSingle
                 };
 
-            // =====================================================
             // ADD CONTROLS
-            // =====================================================
 
             pnlChat.Controls.Add(
                 pnlMessages);
 
             pnlChat.Controls.Add(
                 pnlEmoji);
+
+            pnlChat.Controls.Add(
+                pnlReplyPreview);
 
             pnlChat.Controls.Add(
                 pnlInput);
@@ -900,9 +941,7 @@ namespace ChatTCP.Client.Forms
             Controls.Add(
                 pnlHeader);
 
-            // =====================================================
             // EVENTS
-            // =====================================================
 
             Load +=
                 (s, e) =>
@@ -915,16 +954,12 @@ namespace ChatTCP.Client.Forms
                 ClientForm_FormClosing;
         }
 
-        // =========================================================
         // CLIENT SETUP
-        // =========================================================
 
         private void InitializeClientComponents(
             TcpClientManager tcpClient)
         {
-            // -----------------------------------------------------
             // SESSION
-            // -----------------------------------------------------
 
             SessionManager.Instance.SetCurrentUser(
                 _currentUser);
@@ -934,9 +969,7 @@ namespace ChatTCP.Client.Forms
 
             _tcpClient = tcpClient;
 
-            // -----------------------------------------------------
             // CHAT SERVICE
-            // -----------------------------------------------------
 
             _chatService =
                 new ChatService(
@@ -945,73 +978,46 @@ namespace ChatTCP.Client.Forms
             _chatService.OnMessageReceived +=
                 ChatService_OnMessageReceived;
 
-            // -----------------------------------------------------
             // GROUP SERVICE
-            // -----------------------------------------------------
 
             _groupService =
                 new GroupService(
                     _tcpClient,
                     _currentUser.UserId);
 
-            // -----------------------------------------------------
+            _groupService.GroupListReceived +=
+                OnGroupListReceived;
+
+            _groupService.GroupCreated +=
+                OnGroupCreated;
+
+            _groupService.GroupMessageReceived +=
+                OnGroupMessageReceived;
+
+            _groupService.RequestGroupList();
+
             // EMOJI SERVICE
-            // -----------------------------------------------------
 
             _emojiService =
                 new EmojiService();
 
-            // -----------------------------------------------------
-            // LOAD ONLINE USERS
-            // -----------------------------------------------------
+            // LISTEN TO TCP MESSAGES (UserList & UserStatus)
 
-            var onlineUsers =
-                SessionManager.Instance
-                    .GetOnlineUsers();
+            _tcpClient.MessageReceived +=
+                OnTcpClientMessageReceived;
 
-            foreach (var u in onlineUsers)
+            // REQUEST USER LIST FROM DATABASE
+
+            _tcpClient.SendMessage(new ChatMessage
             {
-                if (u.Username ==
-                    _currentUsername)
-                {
-                    continue;
-                }
-
-                AddUserToList(
-                    u.Username,
-                    string.Equals(
-                        u.Status,
-                        "Online",
-                        StringComparison.OrdinalIgnoreCase));
-            }
-
-            // -----------------------------------------------------
-            // DEMO USERS
-            // -----------------------------------------------------
-
-            AddUserToList(
-                "an_nguyen",
-                true);
-
-            AddUserToList(
-                "minh_le",
-                true);
-
-            AddUserToList(
-                "thu_tran",
-                false);
-
-            // -----------------------------------------------------
-            // DEMO GROUP
-            // -----------------------------------------------------
-
-            AddGroupToList(
-                "Nhóm Đồ Án UDM08");
+                SenderId = _currentUser.UserId,
+                SenderName = _currentUser.Username,
+                Type = MessageType.GetUserListRequest,
+                Timestamp = DateTime.Now
+            });
         }
 
-        // =========================================================
         // USER
-        // =========================================================
 
         private void LvUsers_MouseDown(
             object? sender,
@@ -1058,15 +1064,18 @@ namespace ChatTCP.Client.Forms
             _activeChatIsGroup =
                 false;
 
-            // -----------------------------------------------------
             // HEADER
-            // -----------------------------------------------------
 
             lblChatTarget.Text =
                 username;
 
-            lblChatStatus.Text =
-                "Online";
+            bool isTargetOnline = false;
+            if (_onlineUsersByName.TryGetValue(username, out var targetUser))
+            {
+                isTargetOnline = string.Equals(targetUser.Status, "Online", StringComparison.OrdinalIgnoreCase);
+            }
+
+            UpdateChatHeaderStatus(isTargetOnline);
 
             if (_defaultAvatar != null)
             {
@@ -1075,9 +1084,7 @@ namespace ChatTCP.Client.Forms
                     _defaultAvatar);
             }
 
-            // -----------------------------------------------------
             // SESSION
-            // -----------------------------------------------------
 
             SessionManager.Instance
                 .SetActiveDirectChat(
@@ -1085,11 +1092,10 @@ namespace ChatTCP.Client.Forms
                     tcpClient:
                         _tcpClient);
 
-            // -----------------------------------------------------
             // LOAD HISTORY
-            // -----------------------------------------------------
 
             flpMessages.Controls.Clear();
+            _lastRenderedDate = null;
 
             var cachedHistory =
                 SessionManager.Instance
@@ -1107,9 +1113,7 @@ namespace ChatTCP.Client.Forms
             ScrollMessagesToBottom();
         }
 
-        // =========================================================
         // GROUP CHAT
-        // =========================================================
 
         private void OpenChatWithGroup()
         {
@@ -1130,8 +1134,7 @@ namespace ChatTCP.Client.Forms
             lblChatTarget.Text =
                 groupName;
 
-            lblChatStatus.Text =
-                "Nhóm chat";
+            UpdateChatHeaderStatus(false);
 
             if (_defaultAvatar != null)
             {
@@ -1140,14 +1143,21 @@ namespace ChatTCP.Client.Forms
                     _defaultAvatar);
             }
 
+            int? groupId = null;
+            if (_groupsByName.TryGetValue(groupName, out var groupObj) && groupObj.GroupId > 0)
+            {
+                groupId = groupObj.GroupId;
+            }
+
             SessionManager.Instance
                 .SetActiveGroupChat(
                     groupName,
-                    groupId: null,
+                    groupId: groupId,
                     tcpClient:
                         _tcpClient);
 
             flpMessages.Controls.Clear();
+            _lastRenderedDate = null;
 
             var cachedHistory =
                 SessionManager.Instance
@@ -1165,9 +1175,7 @@ namespace ChatTCP.Client.Forms
             ScrollMessagesToBottom();
         }
 
-        // =========================================================
         // CREATE GROUP
-        // =========================================================
 
         private void BtnCreateGroup_Click(
             object? sender,
@@ -1209,17 +1217,16 @@ namespace ChatTCP.Client.Forms
                     &&
                     createGroupForm.CreatedGroup != null)
                 {
+                    var created = createGroupForm.CreatedGroup;
+                    _groupsByName[created.GroupName] = created;
                     AddGroupToList(
-                        createGroupForm
-                            .CreatedGroup
-                            .GroupName);
+                        created.GroupName,
+                        created);
                 }
             }
         }
 
-        // =========================================================
         // SEND MESSAGE
-        // =========================================================
 
         private void TxtMessage_KeyDown(
             object? sender,
@@ -1292,9 +1299,19 @@ namespace ChatTCP.Client.Forms
                         DateTime.Now
                 };
 
-            // =====================================================
+            if (_activeReplyMessage != null)
+            {
+                message.ReplyToMessageId =
+                    _activeReplyMessage.Id;
+
+                message.ReplyToSenderName =
+                    _activeReplyMessage.SenderName;
+
+                message.ReplyToContent =
+                    _activeReplyMessage.Content;
+            }
+
             // GROUP
-            // =====================================================
 
             if (_activeChatIsGroup)
             {
@@ -1315,7 +1332,10 @@ namespace ChatTCP.Client.Forms
 
                     _groupService.SendGroupMessage(
                         groupId.Value,
-                        content);
+                        content,
+                        replyToId: message.ReplyToMessageId,
+                        replyToSenderName: message.ReplyToSenderName,
+                        replyToContent: message.ReplyToContent);
                 }
                 else
                 {
@@ -1325,9 +1345,7 @@ namespace ChatTCP.Client.Forms
             }
             else
             {
-                // =================================================
                 // DIRECT CHAT
-                // =================================================
 
                 message.Type =
                     MessageType.DirectChat;
@@ -1345,17 +1363,15 @@ namespace ChatTCP.Client.Forms
                     message);
             }
 
-            // =====================================================
+            ClearReplyTarget();
+
             // SESSION
-            // =====================================================
 
             SessionManager.Instance
                 .AddMessage(
                     message);
 
-            // =====================================================
             // ADD TO UI
-            // =====================================================
 
             AddMessageBubble(
                 message,
@@ -1366,9 +1382,7 @@ namespace ChatTCP.Client.Forms
             txtMessage.Focus();
         }
 
-        // =========================================================
         // EMOJI
-        // =========================================================
 
         private void BtnEmoji_Click(
             object? sender,
@@ -1387,70 +1401,32 @@ namespace ChatTCP.Client.Forms
 
             try
             {
-                _emojiPicker =
-                    new EmojiPickerForm();
+                _emojiPicker = new EmojiPickerForm
+                {
+                    TopLevel = false,
+                    FormBorderStyle = FormBorderStyle.None,
+                    Dock = DockStyle.Fill,
+                    ShowInTaskbar = false
+                };
 
-                _emojiPicker.TopLevel =
-                    false;
+                _emojiPicker.EmojiSelected += (emoji) =>
+                {
+                    InsertEmoji(emoji);
+                };
 
-                _emojiPicker.FormBorderStyle =
-                    FormBorderStyle.None;
-
-                _emojiPicker.Dock =
-                    DockStyle.Fill;
-
-                _emojiPicker.ShowInTaskbar =
-                    false;
-
-                _emojiPicker.FormClosed +=
-                    EmojiPicker_FormClosed;
+                _emojiPicker.FormClosed += EmojiPicker_FormClosed;
 
                 pnlEmoji.Controls.Clear();
-
-                pnlEmoji.Controls.Add(
-                    _emojiPicker);
-
-                pnlEmoji.Visible =
-                    true;
+                pnlEmoji.Controls.Add(_emojiPicker);
+                pnlEmoji.Visible = true;
 
                 _emojiPicker.Show();
-
                 _emojiPicker.BringToFront();
-
                 pnlInput.BringToFront();
             }
             catch
             {
                 pnlEmoji.Visible = false;
-
-                using (
-                    var picker =
-                        new EmojiPickerForm())
-                {
-                    picker.StartPosition =
-                        FormStartPosition.Manual;
-
-                    Point screenPoint =
-                        btnEmoji.PointToScreen(
-                            new Point(
-                                0,
-                                -picker.Height - 5));
-
-                    picker.Location =
-                        screenPoint;
-
-                    if (
-                        picker.ShowDialog(this)
-                        ==
-                        DialogResult.OK
-                        &&
-                        !string.IsNullOrEmpty(
-                            picker.SelectedEmoji))
-                    {
-                        InsertEmoji(
-                            picker.SelectedEmoji);
-                    }
-                }
             }
         }
 
@@ -1458,29 +1434,11 @@ namespace ChatTCP.Client.Forms
             object? sender,
             FormClosedEventArgs e)
         {
-            if (_emojiPicker != null)
-            {
-                string emoji =
-                    _emojiPicker.SelectedEmoji;
-
-                if (!string.IsNullOrEmpty(
-                    emoji))
-                {
-                    InsertEmoji(
-                        emoji);
-                }
-            }
-
-            pnlEmoji.Visible =
-                false;
-
+            pnlEmoji.Visible = false;
             pnlEmoji.Controls.Clear();
-
-            _emojiPicker =
-                null;
+            _emojiPicker = null;
 
             LayoutInputBar();
-
             txtMessage.Focus();
         }
 
@@ -1537,9 +1495,7 @@ namespace ChatTCP.Client.Forms
                 null;
         }
 
-        // =========================================================
         // LOGOUT
-        // =========================================================
 
         private void BtnLogout_Click(
             object? sender,
@@ -1557,14 +1513,11 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
-            // Đóng ClientForm sẽ chạy ClientForm_FormClosing,
-            // tại đó TCP connection và các service được giải phóng.
+            IsLoggingOut = true;
             Close();
         }
 
-        // =========================================================
         // FORM CLOSING
-        // =========================================================
 
         private void ClientForm_FormClosing(
             object? sender,
@@ -1588,18 +1541,25 @@ namespace ChatTCP.Client.Forms
 
                 _groupService?.Dispose();
 
-                _tcpClient?.Disconnect();
+                if (_tcpClient != null)
+                {
+                    _tcpClient.MessageReceived -= OnTcpClientMessageReceived;
+                    _tcpClient.Disconnect();
+                }
+
+                SessionManager.Instance.ClearSession(true);
             }
             catch
             {
             }
 
-            Application.Exit();
+            if (!IsLoggingOut)
+            {
+                Application.Exit();
+            }
         }
 
-        // =========================================================
         // HISTORY
-        // =========================================================
 
         private void OnHistoryUpdated(
             string conversationKey,
@@ -1613,6 +1573,7 @@ namespace ChatTCP.Client.Forms
                         .GetActiveConversationKey())
                 {
                     flpMessages.Controls.Clear();
+                    _lastRenderedDate = null;
 
                     foreach (var msg in messages)
                     {
@@ -1627,9 +1588,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
-        // =========================================================
         // RECEIVED MESSAGE
-        // =========================================================
 
         private void ChatService_OnMessageReceived(
             ChatMessage message)
@@ -1649,16 +1608,25 @@ namespace ChatTCP.Client.Forms
                     .AddMessage(
                         message);
 
-                bool isCurrentChat =
-                    (
-                        message.SenderName ==
-                        _activeChatTarget
-                    )
-                    &&
-                    (
-                        isGroupMessage ==
-                        _activeChatIsGroup
-                    );
+                bool isCurrentChat = false;
+                if (isGroupMessage && _activeChatIsGroup)
+                {
+                    if (message.GroupId.HasValue && SessionManager.Instance.ActiveGroupId.HasValue)
+                    {
+                        isCurrentChat = message.GroupId.Value == SessionManager.Instance.ActiveGroupId.Value;
+                    }
+                    else
+                    {
+                        isCurrentChat = true;
+                    }
+                }
+                else if (!isGroupMessage && !_activeChatIsGroup)
+                {
+                    isCurrentChat = string.Equals(
+                        message.SenderName,
+                        _activeChatTarget,
+                        StringComparison.OrdinalIgnoreCase);
+                }
 
                 if (isCurrentChat)
                 {
@@ -1669,9 +1637,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
-        // =========================================================
         // USER STATUS
-        // =========================================================
 
         public void OnUserStatusChanged(
             string username,
@@ -1683,6 +1649,11 @@ namespace ChatTCP.Client.Forms
                     .UpdateUserStatus(
                         username,
                         isOnline);
+
+                if (_onlineUsersByName.TryGetValue(username, out var userObj))
+                {
+                    userObj.Status = isOnline ? "Online" : "Offline";
+                }
 
                 if (
                     _userItems.TryGetValue(
@@ -1699,12 +1670,29 @@ namespace ChatTCP.Client.Forms
                         username,
                         isOnline);
                 }
+
+                if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateChatHeaderStatus(isOnline);
+                }
             });
         }
 
-        // =========================================================
+        private void UpdateChatHeaderStatus(bool isOnline)
+        {
+            if (_activeChatIsGroup)
+            {
+                lblChatStatus.Text = "Nhóm chat";
+                lblChatStatus.ForeColor = Color.Gray;
+            }
+            else
+            {
+                lblChatStatus.Text = isOnline ? "Online" : "Offline";
+                lblChatStatus.ForeColor = isOnline ? Color.SeaGreen : Color.Gray;
+            }
+        }
+
         // GROUP UPDATE
-        // =========================================================
 
         public void OnGroupUpdated(
             string groupName)
@@ -1715,13 +1703,92 @@ namespace ChatTCP.Client.Forms
                         groupName));
         }
 
-        // =========================================================
+        // TCP CLIENT MESSAGE HANDLER (Users & Status)
+
+        private void OnTcpClientMessageReceived(ChatMessage message)
+        {
+            switch (message.Type)
+            {
+                case MessageType.GetUserListResponse:
+                    try
+                    {
+                        var users = System.Text.Json.JsonSerializer.Deserialize<List<User>>(message.Content);
+                        if (users != null)
+                        {
+                            InvokeIfRequired(() =>
+                            {
+                                foreach (var u in users)
+                                {
+                                    if (string.Equals(u.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
+                                        continue;
+
+                                    bool isOnline = string.Equals(u.Status, "Online", StringComparison.OrdinalIgnoreCase);
+                                    AddUserToList(u.Username, isOnline, u);
+                                }
+                            });
+                        }
+                    }
+                    catch { }
+                    break;
+
+                case MessageType.UserStatusUpdate:
+                    try
+                    {
+                        var user = System.Text.Json.JsonSerializer.Deserialize<User>(message.Content);
+                        if (user != null)
+                        {
+                            InvokeIfRequired(() =>
+                            {
+                                if (string.Equals(user.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
+                                    return;
+
+                                bool isOnline = string.Equals(user.Status, "Online", StringComparison.OrdinalIgnoreCase);
+                                AddUserToList(user.Username, isOnline, user);
+                            });
+                        }
+                    }
+                    catch { }
+                    break;
+
+                case MessageType.GetChatHistoryResponse:
+                    try
+                    {
+                        if (message.GroupId.HasValue && message.GroupId.Value > 0)
+                        {
+                            var groupHist = System.Text.Json.JsonSerializer.Deserialize<GroupHistoryResponse>(message.Content);
+                            if (groupHist != null && groupHist.Success && groupHist.Messages != null)
+                            {
+                                string key = SessionManager.GetGroupKey(message.GroupId.Value);
+                                SessionManager.Instance.SetHistory(key, groupHist.Messages);
+                            }
+                        }
+                        else
+                        {
+                            var messages = System.Text.Json.JsonSerializer.Deserialize<List<ChatMessage>>(message.Content);
+                            if (messages != null)
+                            {
+                                string partner = !string.IsNullOrWhiteSpace(message.SenderName) && message.SenderName != "Server"
+                                    ? message.SenderName
+                                    : _activeChatTarget;
+                                if (!string.IsNullOrWhiteSpace(partner))
+                                {
+                                    string key = SessionManager.GetDirectChatKey(partner);
+                                    SessionManager.Instance.SetHistory(key, messages);
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                    break;
+            }
+        }
+
         // ADD USER
-        // =========================================================
 
         private void AddUserToList(
             string username,
-            bool isOnline)
+            bool isOnline,
+            User? userObj = null)
         {
             if (string.Equals(
                 username,
@@ -1731,12 +1798,38 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
+            if (userObj != null)
+            {
+                userObj.Status = isOnline ? "Online" : "Offline";
+                _onlineUsersByName[username] = userObj;
+            }
+            else if (_onlineUsersByName.TryGetValue(username, out var existingUser))
+            {
+                existingUser.Status = isOnline ? "Online" : "Offline";
+            }
+            else
+            {
+                _onlineUsersByName[username] =
+                    new User
+                    {
+                        UserId = _nextDemoUserId++,
+                        Username = username,
+                        DisplayName = username,
+                        Status = isOnline ? "Online" : "Offline"
+                    };
+            }
+
             if (_userItems.ContainsKey(
                 username))
             {
                 UpdateUserStatus(
                     _userItems[username],
                     isOnline);
+
+                if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateChatHeaderStatus(isOnline);
+                }
 
                 return;
             }
@@ -1760,22 +1853,9 @@ namespace ChatTCP.Client.Forms
             _userItems[username] =
                 item;
 
-            if (
-                !_onlineUsersByName.ContainsKey(
-                    username))
+            if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
             {
-                _onlineUsersByName[username] =
-                    new User
-                    {
-                        UserId =
-                            _nextDemoUserId++,
-
-                        Username =
-                            username,
-
-                        DisplayName =
-                            username
-                    };
+                UpdateChatHeaderStatus(isOnline);
             }
         }
 
@@ -1789,23 +1869,36 @@ namespace ChatTCP.Client.Forms
                     : Color.Gray;
         }
 
-        // =========================================================
         // ADD GROUP
-        // =========================================================
 
         private void AddGroupToList(
-            string groupName)
+            string groupName,
+            Group? groupObj = null)
         {
-            if (
-                _groupItems.ContainsKey(
-                    groupName))
+            if (groupObj != null)
+            {
+                _groupsByName[groupName] = groupObj;
+            }
+            else if (!_groupsByName.ContainsKey(groupName))
+            {
+                _groupsByName[groupName] =
+                    new Group
+                    {
+                        GroupName = groupName
+                    };
+            }
+
+            if (_groupItems.ContainsKey(groupName))
             {
                 return;
             }
 
             var item =
                 new ListViewItem(
-                    groupName);
+                    groupName)
+                {
+                    Tag = _groupsByName[groupName]
+                };
 
             lvGroups.Items.Add(
                 item);
@@ -1814,16 +1907,122 @@ namespace ChatTCP.Client.Forms
                 item;
         }
 
-        // =========================================================
-        // CHAT BUBBLE
-        // =========================================================
+        private void OnGroupListReceived(
+            List<Group> groups)
+        {
+            InvokeIfRequired(() =>
+            {
+                foreach (var g in groups)
+                {
+                    _groupsByName[g.GroupName] = g;
+                    AddGroupToList(
+                        g.GroupName,
+                        g);
+                }
+            });
+        }
+
+        private void OnGroupCreated(
+            Group group)
+        {
+            InvokeIfRequired(() =>
+            {
+                _groupsByName[group.GroupName] = group;
+                AddGroupToList(
+                    group.GroupName,
+                    group);
+            });
+        }
+
+        private void OnGroupMessageReceived(
+            ChatMessage message)
+        {
+            OnMessageReceived(
+                message,
+                isGroupMessage: true);
+        }
+
+        // CHAT BUBBLE & DATE SEPARATOR
+
+        private void AddDateSeparator(DateTime date)
+        {
+            int rowWidth =
+                Math.Max(
+                    100,
+                    flpMessages.ClientSize.Width
+                    -
+                    flpMessages.Padding.Left
+                    -
+                    flpMessages.Padding.Right
+                    -
+                    SystemInformation.VerticalScrollBarWidth);
+
+            var row = new Panel
+            {
+                Width = rowWidth,
+                Height = 28,
+                Margin = new Padding(0, 8, 0, 8),
+                Padding = new Padding(0),
+                BackColor = Color.Transparent,
+                Tag = "DATE_SEPARATOR"
+            };
+
+            string dateText;
+            if (date.Date == DateTime.Today)
+            {
+                dateText = $"Hôm nay, {date:dd/MM/yyyy}";
+            }
+            else if (date.Date == DateTime.Today.AddDays(-1))
+            {
+                dateText = $"Hôm qua, {date:dd/MM/yyyy}";
+            }
+            else
+            {
+                dateText = date.ToString("dd/MM/yyyy");
+            }
+
+            var lblDate = new Label
+            {
+                Text = dateText,
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                BackColor = Color.FromArgb(235, 238, 242),
+                Padding = new Padding(12, 4, 12, 4),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Tag = "DATE_LABEL"
+            };
+
+            row.Controls.Add(lblDate);
+            lblDate.PerformLayout();
+
+            lblDate.Location = new Point(
+                Math.Max(0, (row.Width - lblDate.Width) / 2),
+                Math.Max(0, (row.Height - lblDate.Height) / 2));
+
+            flpMessages.Controls.Add(row);
+        }
 
         private void AddMessageBubble(
             ChatMessage message,
             bool isMine)
         {
+            if (message.Timestamp == default)
+            {
+                message.Timestamp = DateTime.Now;
+            }
+
+            // Hiển thị dòng phân cách ngày nếu tin nhắn thuộc ngày mới
+            if (_lastRenderedDate == null || _lastRenderedDate.Value.Date != message.Timestamp.Date)
+            {
+                AddDateSeparator(message.Timestamp.Date);
+                _lastRenderedDate = message.Timestamp.Date;
+            }
+
             var bubble =
                 new ChatBubble();
+
+            bubble.Tag = isMine ? "MINE" : "OTHER";
 
             bubble.SetMessage(
                 message,
@@ -1831,6 +2030,9 @@ namespace ChatTCP.Client.Forms
 
             bubble.ReplyClicked +=
                 ChatBubble_ReplyClicked;
+
+            bubble.ForwardClicked +=
+                ChatBubble_ForwardClicked;
 
             int rowWidth =
                 Math.Max(
@@ -1914,9 +2116,7 @@ namespace ChatTCP.Client.Forms
             ScrollMessagesToBottom();
         }
 
-        // =========================================================
         // RESIZE MESSAGE ROWS
-        // =========================================================
 
         private void FlpMessages_Resize(
             object? sender,
@@ -1962,6 +2162,12 @@ namespace ChatTCP.Client.Forms
                 Control bubble =
                     row.Controls[0];
 
+                if (row.Tag as string == "DATE_SEPARATOR" || bubble.Tag as string == "DATE_LABEL")
+                {
+                    bubble.Left = Math.Max(0, (row.Width - bubble.Width) / 2);
+                    continue;
+                }
+
                 bool isMine =
                     bubble.Tag as string ==
                     "MINE";
@@ -1990,26 +2196,244 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // =========================================================
         // REPLY
-        // =========================================================
+
 
         private void ChatBubble_ReplyClicked(
             object? sender,
             ChatMessage repliedMessage)
         {
-            MessageBox.Show(
-                $"Đang trả lời: \"{repliedMessage.Content}\"\n" +
-                "(Chức năng gửi kèm Reply sẽ hoàn thiện " +
-                "khi ChatService tích hợp.)",
-                "Trả lời tin nhắn",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            SetReplyTarget(
+                repliedMessage);
         }
 
-        // =========================================================
+        private void SetReplyTarget(
+            ChatMessage repliedMessage)
+        {
+            _activeReplyMessage =
+                repliedMessage;
+
+            _chatService.SetReplyTarget(
+                repliedMessage);
+
+            string preview =
+                repliedMessage.Content.Length > 40
+                    ? repliedMessage.Content.Substring(0, 37) + "..."
+                    : repliedMessage.Content;
+
+            lblReplyPreview.Text =
+                $"↩ Trả lời {repliedMessage.SenderName}: \"{preview}\"";
+
+            pnlReplyPreview.Visible =
+                true;
+
+            txtMessage.Focus();
+        }
+
+        private void ClearReplyTarget()
+        {
+            _activeReplyMessage =
+                null;
+
+            _chatService.ClearReplyTarget();
+
+            pnlReplyPreview.Visible =
+                false;
+        }
+
+        private void BtnCancelReply_Click(
+            object? sender,
+            EventArgs e)
+        {
+            ClearReplyTarget();
+        }
+
+        // FORWARD
+
+        private void ChatBubble_ForwardClicked(
+            object? sender,
+            ChatMessage messageToForward)
+        {
+            if (_tcpClient == null ||
+                !_tcpClient.IsConnected)
+            {
+                MessageBox.Show(
+                    "Client chưa kết nối đến Server.",
+                    "Chuyển tiếp tin nhắn",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            var userList =
+                _onlineUsersByName.Values
+                    .Where(u =>
+                        !string.Equals(
+                            u.Username,
+                            _currentUsername,
+                            StringComparison.OrdinalIgnoreCase)
+                        &&
+                        (_activeChatIsGroup ||
+                         !string.Equals(
+                             u.Username,
+                             _activeChatTarget,
+                             StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+            var groupList =
+                _groupsByName.Values
+                    .Where(g =>
+                        !_activeChatIsGroup ||
+                        !string.Equals(
+                            g.GroupName,
+                            _activeChatTarget,
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+            using var dlg =
+                new ForwardDialog(
+                    userList,
+                    groupList,
+                    messageToForward);
+
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                if (dlg.IsTargetGroup)
+                {
+                    int? groupId = dlg.SelectedGroupId;
+                    if ((!groupId.HasValue || groupId.Value <= 0) &&
+                        _groupsByName.TryGetValue(dlg.SelectedGroupName, out var gObj) &&
+                        gObj.GroupId > 0)
+                    {
+                        groupId = gObj.GroupId;
+                    }
+
+                    var forwardMsg =
+                        new ChatMessage
+                        {
+                            SenderId =
+                                _currentUser.UserId,
+
+                            SenderName =
+                                _currentUsername,
+
+                            GroupId =
+                                groupId,
+
+                            Content =
+                                messageToForward.Content,
+
+                            Type =
+                                MessageType.GroupChat,
+
+                            IsForward =
+                                true,
+
+                            Timestamp =
+                                DateTime.Now
+                        };
+
+                    if (_groupService != null && groupId.HasValue && groupId.Value > 0)
+                    {
+                        _groupService.SendGroupMessage(
+                            groupId.Value,
+                            messageToForward.Content,
+                            isForward: true);
+                    }
+                    else
+                    {
+                        _chatService.SendMessage(
+                            forwardMsg);
+                    }
+
+                    SessionManager.Instance
+                        .AddGroupMessage(
+                            dlg.SelectedGroupName,
+                            groupId,
+                            forwardMsg);
+
+                    if (_activeChatIsGroup &&
+                        string.Equals(
+                            _activeChatTarget,
+                            dlg.SelectedGroupName,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        AddMessageBubble(
+                            forwardMsg,
+                            isMine: true);
+                    }
+
+                    MessageBox.Show(
+                        $"Đã chuyển tiếp tin nhắn đến nhóm {dlg.TargetName}.",
+                        "Chuyển tiếp tin nhắn",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                else
+                {
+                    int? receiverId = dlg.SelectedReceiverId;
+                    if ((!receiverId.HasValue || receiverId.Value <= 0) &&
+                        _onlineUsersByName.TryGetValue(dlg.SelectedReceiverUsername, out var uObj) &&
+                        uObj.UserId > 0)
+                    {
+                        receiverId = uObj.UserId;
+                    }
+
+                    var forwardMsg =
+                        new ChatMessage
+                        {
+                            SenderId =
+                                _currentUser.UserId,
+
+                            SenderName =
+                                _currentUsername,
+
+                            ReceiverId =
+                                receiverId,
+
+                            Content =
+                                messageToForward.Content,
+
+                            Type =
+                                MessageType.DirectChat,
+
+                            IsForward =
+                                true,
+
+                            Timestamp =
+                                DateTime.Now
+                        };
+
+                    _chatService.SendMessage(
+                        forwardMsg);
+
+                    SessionManager.Instance
+                        .AddDirectMessage(
+                            dlg.SelectedReceiverUsername,
+                            forwardMsg);
+
+                    if (!_activeChatIsGroup &&
+                        string.Equals(
+                            _activeChatTarget,
+                            dlg.SelectedReceiverUsername,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        AddMessageBubble(
+                            forwardMsg,
+                            isMine: true);
+                    }
+
+                    MessageBox.Show(
+                        $"Đã chuyển tiếp tin nhắn đến {dlg.TargetName}.",
+                        "Chuyển tiếp tin nhắn",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+        }
+
         // SCROLL
-        // =========================================================
 
         private void ScrollMessagesToBottom()
         {
@@ -2037,9 +2461,7 @@ namespace ChatTCP.Client.Forms
             pnlMessages.PerformLayout();
         }
 
-        // =========================================================
         // INPUT LAYOUT
-        // =========================================================
 
         private void LayoutInputBar()
         {
@@ -2071,9 +2493,7 @@ namespace ChatTCP.Client.Forms
                     8);
         }
 
-        // =========================================================
         // AVATAR LOADER
-        // =========================================================
 
         private static Image? LoadAvatar(
             string? fileName)
@@ -2131,9 +2551,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // =========================================================
         // CIRCLE AVATAR
-        // =========================================================
 
         private static void MakeCircle(
             Control control)
@@ -2151,9 +2569,7 @@ namespace ChatTCP.Client.Forms
                 new Region(path);
         }
 
-        // =========================================================
         // INITIALS
-        // =========================================================
 
         private static string GetInitials(
             string username)
@@ -2173,9 +2589,7 @@ namespace ChatTCP.Client.Forms
                     .ToUpper();
         }
 
-        // =========================================================
         // UI THREAD
-        // =========================================================
 
         private void InvokeIfRequired(
             Action action)

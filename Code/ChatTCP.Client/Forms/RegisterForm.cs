@@ -14,9 +14,7 @@ namespace ChatTCP.Client.Forms
     {
         private readonly AuthService authService;
 
-        // =========================
         // AVATAR
-        // =========================
 
         private readonly PictureBox picAvatarPreview =
             new PictureBox();
@@ -31,9 +29,7 @@ namespace ChatTCP.Client.Forms
         public string? SelectedAvatarPath =>
             _selectedAvatarPath;
 
-        // =========================
         // INPUT
-        // =========================
 
         private readonly TextBox txtUsername =
             new TextBox();
@@ -50,9 +46,7 @@ namespace ChatTCP.Client.Forms
         private readonly CheckBox chkShowPassword =
             new CheckBox();
 
-        // =========================
         // BUTTONS
-        // =========================
 
         private readonly Button btnRegister =
             new Button();
@@ -60,16 +54,12 @@ namespace ChatTCP.Client.Forms
         private readonly Button btnCancel =
             new Button();
 
-        // =========================
         // STATUS
-        // =========================
 
         private readonly Label lblStatus =
             new Label();
 
-        // =========================
         // RESULT
-        // =========================
 
         public User? RegisteredUser
         {
@@ -77,9 +67,7 @@ namespace ChatTCP.Client.Forms
             private set;
         }
 
-        // =========================
         // CONSTRUCTOR
-        // =========================
 
         public RegisterForm(AuthService authService)
         {
@@ -97,9 +85,7 @@ namespace ChatTCP.Client.Forms
                 RegisterForm_FormClosed;
         }
 
-        // =========================
         // INITIALIZE UI
-        // =========================
 
         private void InitializeUi()
         {
@@ -121,9 +107,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     9F);
 
-            // ==================================================
             // AVATAR
-            // ==================================================
 
             picAvatarPreview.Size =
                 new Size(90, 90);
@@ -160,9 +144,7 @@ namespace ChatTCP.Client.Forms
             ImageUtils.MakeCircle(
                 picAvatarPreview);
 
-            // ==================================================
             // BUTTON CHỌN AVATAR
-            // ==================================================
 
             btnChooseAvatar.Text =
                 "📷 Chọn ảnh";
@@ -184,9 +166,7 @@ namespace ChatTCP.Client.Forms
             btnChooseAvatar.Click +=
                 BtnChooseAvatar_Click;
 
-            // ==================================================
             // TITLE
-            // ==================================================
 
             Label lblTitle =
                 new Label
@@ -207,9 +187,7 @@ namespace ChatTCP.Client.Forms
                             FontStyle.Bold)
                 };
 
-            // ==================================================
             // USERNAME
-            // ==================================================
 
             Label lblUsername =
                 new Label
@@ -236,9 +214,7 @@ namespace ChatTCP.Client.Forms
 
             txtUsername.MaxLength = 50;
 
-            // ==================================================
             // DISPLAY NAME
-            // ==================================================
 
             Label lblDisplayName =
                 new Label
@@ -265,9 +241,7 @@ namespace ChatTCP.Client.Forms
 
             txtDisplayName.MaxLength = 100;
 
-            // ==================================================
             // PASSWORD
-            // ==================================================
 
             Label lblPassword =
                 new Label
@@ -296,9 +270,7 @@ namespace ChatTCP.Client.Forms
 
             txtPassword.MaxLength = 100;
 
-            // ==================================================
             // CONFIRM PASSWORD
-            // ==================================================
 
             Label lblConfirmPassword =
                 new Label
@@ -329,9 +301,7 @@ namespace ChatTCP.Client.Forms
             txtConfirmPassword.MaxLength =
                 100;
 
-            // ==================================================
             // SHOW PASSWORD
-            // ==================================================
 
             chkShowPassword.Text =
                 "Hiện mật khẩu";
@@ -347,9 +317,7 @@ namespace ChatTCP.Client.Forms
             chkShowPassword.CheckedChanged +=
                 ChkShowPassword_CheckedChanged;
 
-            // ==================================================
             // STATUS
-            // ==================================================
 
             lblStatus.Text = "";
 
@@ -371,9 +339,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     8.5F);
 
-            // ==================================================
             // REGISTER BUTTON
-            // ==================================================
 
             btnRegister.Text =
                 "Đăng ký";
@@ -391,9 +357,7 @@ namespace ChatTCP.Client.Forms
             btnRegister.Click +=
                 BtnRegister_Click;
 
-            // ==================================================
             // CANCEL BUTTON
-            // ==================================================
 
             btnCancel.Text =
                 "Hủy";
@@ -411,9 +375,7 @@ namespace ChatTCP.Client.Forms
             btnCancel.DialogResult =
                 DialogResult.Cancel;
 
-            // ==================================================
             // ADD CONTROLS
-            // ==================================================
 
             Controls.Add(
                 picAvatarPreview);
@@ -467,9 +429,7 @@ namespace ChatTCP.Client.Forms
                 btnCancel;
         }
 
-        // ==================================================
         // CHỌN AVATAR
-        // ==================================================
 
         private void BtnChooseAvatar_Click(
             object? sender,
@@ -556,9 +516,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // ==================================================
         // LƯU AVATAR ĐÃ CHỌN VÀO Resources/Avatars/ CỦA CLIENT
-        // ==================================================
         //
         // ĐÃ SỬA (fix bug "avatar chọn lúc đăng ký không hiện lúc đăng nhập"):
         // Trước đây _selectedAvatarPath chỉ dùng để preview trong bộ nhớ, không
@@ -622,9 +580,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // ==================================================
         // SHOW / HIDE PASSWORD
-        // ==================================================
 
         private void ChkShowPassword_CheckedChanged(
             object? sender,
@@ -642,9 +598,7 @@ namespace ChatTCP.Client.Forms
                 pwdChar;
         }
 
-        // ==================================================
         // REGISTER
-        // ==================================================
 
         private void BtnRegister_Click(
             object? sender,
@@ -662,9 +616,7 @@ namespace ChatTCP.Client.Forms
             string confirmPassword =
                 txtConfirmPassword.Text;
 
-            // -------------------------
             // USERNAME
-            // -------------------------
 
             if (string.IsNullOrWhiteSpace(
                 username))
@@ -689,9 +641,7 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
-            // -------------------------
             // PASSWORD
-            // -------------------------
 
             if (string.IsNullOrWhiteSpace(
                 password))
@@ -714,9 +664,7 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
-            // -------------------------
             // CONFIRM PASSWORD
-            // -------------------------
 
             if (password != confirmPassword)
             {
@@ -728,9 +676,7 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
-            // -------------------------
             // DISPLAY NAME
-            // -------------------------
 
             if (string.IsNullOrWhiteSpace(
                 displayName))
@@ -738,9 +684,7 @@ namespace ChatTCP.Client.Forms
                 displayName = username;
             }
 
-            // -------------------------
             // REGISTER
-            // -------------------------
 
             try
             {
@@ -770,9 +714,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // ==================================================
         // REGISTER SUCCESS
-        // ==================================================
 
         private void OnRegisterSucceeded(
             User user)
@@ -788,9 +730,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
-        // ==================================================
         // REGISTER FAILED
-        // ==================================================
 
         private void OnRegisterFailed(
             string errorMessage)
@@ -804,9 +744,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
-        // ==================================================
         // FORM CLOSED
-        // ==================================================
 
         private void RegisterForm_FormClosed(
             object? sender,
@@ -830,9 +768,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // ==================================================
         // STATUS
-        // ==================================================
 
         private void ShowStatus(
             string message,
@@ -847,9 +783,7 @@ namespace ChatTCP.Client.Forms
                     : Color.SteelBlue;
         }
 
-        // ==================================================
         // UI THREAD
-        // ==================================================
 
         private void RunOnUiThread(
             Action action)

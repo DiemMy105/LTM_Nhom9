@@ -17,6 +17,7 @@ namespace ChatTCP.Client.UserControls
         private const int MaxContentWidth = 260;
 
         private Label lblSender = new Label();
+        private Label lblForwarded = new Label();
         private Label lblReplyQuote = new Label();
         private Label lblContent = new Label();
         private Label lblTime = new Label();
@@ -39,6 +40,12 @@ namespace ChatTCP.Client.UserControls
             lblSender.Location = new Point(8, 6);
             lblSender.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             lblSender.ForeColor = Color.DarkBlue;
+
+            lblForwarded.AutoSize = true;
+            lblForwarded.Font = new Font("Segoe UI", 8F, FontStyle.Italic);
+            lblForwarded.ForeColor = Color.Gray;
+            lblForwarded.Text = "↪ Đã chuyển tiếp";
+            lblForwarded.Visible = false;
 
             lblReplyQuote.AutoSize = true;
             lblReplyQuote.MaximumSize = new Size(MaxContentWidth, 0);
@@ -68,12 +75,14 @@ namespace ChatTCP.Client.UserControls
 
             // Quan trọng: phải add vào Controls thì mới hiển thị được.
             this.Controls.Add(lblSender);
+            this.Controls.Add(lblForwarded);
             this.Controls.Add(lblReplyQuote);
             this.Controls.Add(lblContent);
             this.Controls.Add(lblTime);
 
             // Các Label AutoSize nên sắp lại vị trí mỗi khi Text/kích thước con thay đổi.
             lblSender.SizeChanged += (s, e) => LayoutBubble();
+            lblForwarded.SizeChanged += (s, e) => LayoutBubble();
             lblReplyQuote.SizeChanged += (s, e) => LayoutBubble();
             lblContent.SizeChanged += (s, e) => LayoutBubble();
         }
@@ -84,6 +93,8 @@ namespace ChatTCP.Client.UserControls
 
             lblSender.Text = message.SenderName;
             lblSender.Visible = !isSelf; // tin nhắn của mình thì không cần hiện lại tên mình
+
+            lblForwarded.Visible = message.IsForward;
 
             lblContent.Text = message.Content;
             lblTime.Text = message.Timestamp.ToString("HH:mm");
@@ -103,7 +114,7 @@ namespace ChatTCP.Client.UserControls
             LayoutBubble();
         }
 
-        // Xếp các Label theo chiều dọc: [Sender] -> [ReplyQuote] -> [Content] -> [Time]
+        // Xếp các Label theo chiều dọc: [Sender] -> [Forwarded] -> [ReplyQuote] -> [Content] -> [Time]
         // Chỉ hiện các dòng đang Visible, dòng nào ẩn thì bỏ qua khoảng trống của nó.
         private void LayoutBubble()
         {
@@ -114,6 +125,12 @@ namespace ChatTCP.Client.UserControls
             {
                 lblSender.Location = new Point(x, y);
                 y += lblSender.Height + 2;
+            }
+
+            if (lblForwarded.Visible)
+            {
+                lblForwarded.Location = new Point(x, y);
+                y += lblForwarded.Height + 2;
             }
 
             if (lblReplyQuote.Visible)
@@ -130,6 +147,7 @@ namespace ChatTCP.Client.UserControls
 
             int contentWidth = Math.Max(lblContent.Width, lblReplyQuote.Visible ? lblReplyQuote.Width : 0);
             contentWidth = Math.Max(contentWidth, lblSender.Visible ? lblSender.Width : 0);
+            contentWidth = Math.Max(contentWidth, lblForwarded.Visible ? lblForwarded.Width : 0);
 
             this.Size = new Size(contentWidth + x + 8, y);
         }

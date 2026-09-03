@@ -96,7 +96,10 @@ namespace ChatTCP.Server.Services
                     requestMessage.ReplyToSenderName,
 
                 ReplyToContent =
-                    requestMessage.ReplyToContent
+                    requestMessage.ReplyToContent,
+
+                IsForward =
+                    requestMessage.IsForward
             };
 
             return new GroupMessageResult

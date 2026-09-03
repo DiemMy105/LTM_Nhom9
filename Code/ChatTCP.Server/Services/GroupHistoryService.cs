@@ -240,7 +240,10 @@ namespace ChatTCP.Server.Services
                     source.ReplyToSenderName,
 
                 ReplyToContent =
-                    source.ReplyToContent
+                    source.ReplyToContent,
+
+                IsForward =
+                    source.IsForward
             };
         }
     }

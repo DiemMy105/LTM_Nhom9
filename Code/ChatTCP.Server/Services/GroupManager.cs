@@ -10,6 +10,8 @@ namespace ChatTCP.Server.Services
 {
     public class GroupManager
     {
+        private readonly DatabaseService? _dbService;
+
         private readonly object groupLock =
             new object();
 
@@ -21,6 +23,28 @@ namespace ChatTCP.Server.Services
         public event Action<Group>? GroupCreated;
         public event Action<Group>? GroupUpdated;
         public event Action<Group>? GroupDissolved;
+
+        public GroupManager(DatabaseService? dbService = null)
+        {
+            _dbService = dbService;
+
+            if (_dbService != null)
+            {
+                try
+                {
+                    var dbGroups = _dbService.GetAllGroups();
+                    if (dbGroups != null && dbGroups.Count > 0)
+                    {
+                        groups.AddRange(dbGroups);
+                        nextGroupId = groups.Max(g => g.GroupId) + 1;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[GroupManager] Lỗi nạp nhóm từ CSDL: {ex.Message}");
+                }
+            }
+        }
 
         public Group CreateGroup(
             string groupName,
@@ -63,19 +87,40 @@ namespace ChatTCP.Server.Services
 
             Group storedGroup;
 
-            lock (groupLock)
+            if (_dbService != null)
+            {
+                var dbGroup = _dbService.CreateGroup(normalizedName, createdBy, validMemberIds);
+                if (dbGroup != null)
+                {
+                    storedGroup = dbGroup;
+                }
+                else
+                {
+                    storedGroup = new Group
+                    {
+                        GroupId = nextGroupId++,
+                        GroupName = normalizedName,
+                        CreatedBy = createdBy,
+                        CreatedAt = DateTime.Now,
+                        MemberIds = validMemberIds
+                    };
+                }
+            }
+            else
             {
                 storedGroup = new Group
                 {
-                    GroupId = nextGroupId,
+                    GroupId = nextGroupId++,
                     GroupName = normalizedName,
                     CreatedBy = createdBy,
                     CreatedAt = DateTime.Now,
                     MemberIds = validMemberIds
                 };
+            }
 
-                nextGroupId++;
-
+            lock (groupLock)
+            {
+                groups.RemoveAll(g => g.GroupId == storedGroup.GroupId);
                 groups.Add(storedGroup);
             }
 

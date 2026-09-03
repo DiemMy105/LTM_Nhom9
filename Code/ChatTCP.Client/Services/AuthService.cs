@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.Json;
 using ChatTCP.Client.Network;
 using ChatTCP.Shared.Enums;
@@ -294,9 +294,7 @@ namespace ChatTCP.Client.Services
             tcpClientManager.Disconnect();
         }
 
-        // =========================
         // REQUEST / RESPONSE MODELS
-        // =========================
 
         private class LoginRequestData
         {

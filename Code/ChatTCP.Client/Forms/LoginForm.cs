@@ -11,15 +11,11 @@ namespace ChatTCP.Client.Forms
 {
     public class LoginForm : Form
     {
-        // =========================================================
         // AUTH SERVICE
-        // =========================================================
 
         private readonly AuthService authService;
 
-        // =========================================================
         // CONTROLS
-        // =========================================================
 
         private TextBox txtUsername = null!;
         private TextBox txtPassword = null!;
@@ -32,15 +28,11 @@ namespace ChatTCP.Client.Forms
 
         private Label lblStatus = null!;
 
-        // =========================================================
         // USER
-        // =========================================================
 
         public User? LoggedInUser { get; private set; }
 
-        // =========================================================
         // CONSTRUCTOR
-        // =========================================================
 
         public LoginForm(AuthService authService)
         {
@@ -58,15 +50,11 @@ namespace ChatTCP.Client.Forms
                 LoginForm_FormClosed;
         }
 
-        // =========================================================
         // INITIALIZE UI
-        // =========================================================
 
         private void InitializeUi()
         {
-            // =====================================================
             // FORM
-            // =====================================================
 
             Text = "Chat TCP - Đăng nhập";
 
@@ -91,9 +79,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     9F);
 
-            // =====================================================
             // TITLE
-            // =====================================================
 
             Label lblTitle =
                 new Label();
@@ -126,9 +112,7 @@ namespace ChatTCP.Client.Forms
                     22F,
                     FontStyle.Bold);
 
-            // =====================================================
             // SUBTITLE
-            // =====================================================
 
             Label lblSubtitle =
                 new Label();
@@ -157,9 +141,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     9.5F);
 
-            // =====================================================
             // USERNAME LABEL
-            // =====================================================
 
             Label lblUsername =
                 new Label();
@@ -182,9 +164,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     9F);
 
-            // =====================================================
             // USERNAME TEXTBOX
-            // =====================================================
 
             txtUsername =
                 new TextBox();
@@ -207,9 +187,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     10F);
 
-            // =====================================================
             // PASSWORD LABEL
-            // =====================================================
 
             Label lblPassword =
                 new Label();
@@ -232,9 +210,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     9F);
 
-            // =====================================================
             // PASSWORD TEXTBOX
-            // =====================================================
 
             txtPassword =
                 new TextBox();
@@ -261,9 +237,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     10F);
 
-            // =====================================================
             // SHOW PASSWORD
-            // =====================================================
 
             chkShowPassword =
                 new CheckBox();
@@ -298,9 +272,7 @@ namespace ChatTCP.Client.Forms
             chkShowPassword.CheckedChanged +=
                 ChkShowPassword_CheckedChanged;
 
-            // =====================================================
             // STATUS
-            // =====================================================
 
             lblStatus =
                 new Label();
@@ -328,9 +300,7 @@ namespace ChatTCP.Client.Forms
                     "Segoe UI",
                     8.5F);
 
-            // =====================================================
             // LOGIN BUTTON
-            // =====================================================
 
             btnLogin =
                 new Button();
@@ -378,9 +348,7 @@ namespace ChatTCP.Client.Forms
             btnLogin.Click +=
                 BtnLogin_Click;
 
-            // =====================================================
             // REGISTER LINK
-            // =====================================================
 
             lnkRegister =
                 new LinkLabel();
@@ -418,9 +386,7 @@ namespace ChatTCP.Client.Forms
             lnkRegister.LinkClicked +=
                 LnkRegister_LinkClicked;
 
-            // =====================================================
             // ADD CONTROLS
-            // =====================================================
 
             Controls.Add(lblTitle);
 
@@ -442,9 +408,7 @@ namespace ChatTCP.Client.Forms
 
             Controls.Add(lnkRegister);
 
-            // =====================================================
             // ENTER ĐỂ ĐĂNG NHẬP
-            // =====================================================
 
             AcceptButton =
                 btnLogin;
@@ -453,9 +417,7 @@ namespace ChatTCP.Client.Forms
                 TxtPassword_KeyDown;
         }
 
-        // =========================================================
         // HIỆN / ẨN MẬT KHẨU
-        // =========================================================
 
         private void ChkShowPassword_CheckedChanged(
             object? sender,
@@ -475,9 +437,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // =========================================================
         // ENTER ĐỂ ĐĂNG NHẬP
-        // =========================================================
 
         private void TxtPassword_KeyDown(
             object? sender,
@@ -493,9 +453,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // =========================================================
         // LOGIN
-        // =========================================================
 
         private async void BtnLogin_Click(
             object? sender,
@@ -507,9 +465,7 @@ namespace ChatTCP.Client.Forms
             string password =
                 txtPassword.Text;
 
-            // -----------------------------------------------------
             // USERNAME
-            // -----------------------------------------------------
 
             if (string.IsNullOrWhiteSpace(username))
             {
@@ -521,9 +477,7 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
-            // -----------------------------------------------------
             // PASSWORD
-            // -----------------------------------------------------
 
             if (string.IsNullOrWhiteSpace(password))
             {
@@ -540,9 +494,7 @@ namespace ChatTCP.Client.Forms
 
             try
             {
-                // -------------------------------------------------
                 // KẾT NỐI SERVER
-                // -------------------------------------------------
 
                 bool connected =
                     await EnsureConnectedAsync();
@@ -559,9 +511,7 @@ namespace ChatTCP.Client.Forms
                     return;
                 }
 
-                // -------------------------------------------------
                 // LOGIN
-                // -------------------------------------------------
 
                 ShowStatus(
                     "Đang đăng nhập...",
@@ -581,9 +531,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // =========================================================
         // REGISTER
-        // =========================================================
 
         private async void LnkRegister_LinkClicked(
             object? sender,
@@ -632,9 +580,7 @@ namespace ChatTCP.Client.Forms
             }
         }
 
-        // =========================================================
         // ENSURE CONNECTION
-        // =========================================================
 
         private async Task<bool> EnsureConnectedAsync()
         {
@@ -654,9 +600,7 @@ namespace ChatTCP.Client.Forms
                         NetworkConfig.ServerPort));
         }
 
-        // =========================================================
         // LOGIN SUCCESS
-        // =========================================================
 
         private void OnLoginSucceeded(
             User user)
@@ -674,7 +618,19 @@ namespace ChatTCP.Client.Forms
                 clientForm.FormClosed +=
                     (s, args) =>
                     {
-                        Close();
+                        if (clientForm.IsLoggingOut)
+                        {
+                            txtPassword.Clear();
+                            lblStatus.Text = "";
+                            btnLogin.Enabled = true;
+                            Show();
+                            BringToFront();
+                            txtPassword.Focus();
+                        }
+                        else
+                        {
+                            Close();
+                        }
                     };
 
                 clientForm.Show();
@@ -683,9 +639,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
-        // =========================================================
         // LOGIN FAILED
-        // =========================================================
 
         private void OnLoginFailed(
             string errorMessage)
@@ -700,9 +654,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
-        // =========================================================
         // FORM CLOSED
-        // =========================================================
 
         private void LoginForm_FormClosed(
             object? sender,
@@ -715,9 +667,7 @@ namespace ChatTCP.Client.Forms
                 OnLoginFailed;
         }
 
-        // =========================================================
         // STATUS
-        // =========================================================
 
         private void ShowStatus(
             string message,
@@ -732,9 +682,7 @@ namespace ChatTCP.Client.Forms
                     : Color.SteelBlue;
         }
 
-        // =========================================================
         // UI THREAD
-        // =========================================================
 
         private void RunOnUiThread(
             Action action)
