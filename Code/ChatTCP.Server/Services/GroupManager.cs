@@ -6,21 +6,53 @@ using ChatTCP.Shared.Enums;
 using ChatTCP.Shared.Models;
 using Message = ChatTCP.Shared.Models.Message;
 
+
 namespace ChatTCP.Server.Services
 {
     public class GroupManager
     {
+        private readonly DatabaseService? _dbService;
+
+
         private readonly object groupLock =
             new object();
+
 
         private readonly List<Group> groups =
             new List<Group>();
 
+
         private int nextGroupId = 1;
+
 
         public event Action<Group>? GroupCreated;
         public event Action<Group>? GroupUpdated;
         public event Action<Group>? GroupDissolved;
+
+
+        public GroupManager(DatabaseService? dbService = null)
+        {
+            _dbService = dbService;
+
+
+            if (_dbService != null)
+            {
+                try
+                {
+                    var dbGroups = _dbService.GetAllGroups();
+                    if (dbGroups != null && dbGroups.Count > 0)
+                    {
+                        groups.AddRange(dbGroups);
+                        nextGroupId = groups.Max(g => g.GroupId) + 1;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[GroupManager] Lỗi nạp nhóm từ CSDL: {ex.Message}");
+                }
+            }
+        }
+
 
         public Group CreateGroup(
             string groupName,
@@ -33,8 +65,10 @@ namespace ChatTCP.Server.Services
                     "Tên nhóm không được để trống.");
             }
 
+
             string normalizedName =
                 groupName.Trim();
+
 
             if (normalizedName.Length > 100)
             {
@@ -42,11 +76,13 @@ namespace ChatTCP.Server.Services
                     "Tên nhóm không được vượt quá 100 ký tự.");
             }
 
+
             if (createdBy <= 0)
             {
                 throw new ArgumentException(
                     "Người tạo nhóm không hợp lệ.");
             }
+
 
             List<int> validMemberIds =
                 memberIds == null
@@ -56,36 +92,65 @@ namespace ChatTCP.Server.Services
                         .Distinct()
                         .ToList();
 
+
             if (!validMemberIds.Contains(createdBy))
             {
                 validMemberIds.Add(createdBy);
             }
 
+
             Group storedGroup;
 
-            lock (groupLock)
+
+            if (_dbService != null)
+            {
+                var dbGroup = _dbService.CreateGroup(normalizedName, createdBy, validMemberIds);
+                if (dbGroup != null)
+                {
+                    storedGroup = dbGroup;
+                }
+                else
+                {
+                    storedGroup = new Group
+                    {
+                        GroupId = nextGroupId++,
+                        GroupName = normalizedName,
+                        CreatedBy = createdBy,
+                        CreatedAt = DateTime.Now,
+                        MemberIds = validMemberIds
+                    };
+                }
+            }
+            else
             {
                 storedGroup = new Group
                 {
-                    GroupId = nextGroupId,
+                    GroupId = nextGroupId++,
                     GroupName = normalizedName,
                     CreatedBy = createdBy,
                     CreatedAt = DateTime.Now,
                     MemberIds = validMemberIds
                 };
+            }
 
-                nextGroupId++;
 
+            lock (groupLock)
+            {
+                groups.RemoveAll(g => g.GroupId == storedGroup.GroupId);
                 groups.Add(storedGroup);
             }
+
 
             Group result =
                 CloneGroup(storedGroup);
 
+
             GroupCreated?.Invoke(result);
+
 
             return result;
         }
+
 
         public List<Group> GetGroups()
         {
@@ -97,6 +162,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         public List<Group> GetGroupsForUser(
             int userId)
         {
@@ -105,6 +171,7 @@ namespace ChatTCP.Server.Services
                 throw new ArgumentException(
                     "Người dùng không hợp lệ.");
             }
+
 
             lock (groupLock)
             {
@@ -117,6 +184,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         public Group? GetGroupById(
             int groupId)
         {
@@ -125,6 +193,7 @@ namespace ChatTCP.Server.Services
                 return null;
             }
 
+
             lock (groupLock)
             {
                 Group? group =
@@ -132,14 +201,17 @@ namespace ChatTCP.Server.Services
                         item =>
                             item.GroupId == groupId);
 
+
                 if (group == null)
                 {
                     return null;
                 }
 
+
                 return CloneGroup(group);
             }
         }
+
 
         public List<int> GetMemberIds(
             int groupId)
@@ -149,9 +221,11 @@ namespace ChatTCP.Server.Services
                 Group group =
                     FindGroupLocked(groupId);
 
+
                 return group.MemberIds.ToList();
             }
         }
+
 
         public bool IsOwner(
             int groupId,
@@ -164,10 +238,12 @@ namespace ChatTCP.Server.Services
                         item =>
                             item.GroupId == groupId);
 
+
                 return group != null &&
                        group.IsOwner(userId);
             }
         }
+
 
         public bool IsMember(
             int groupId,
@@ -180,10 +256,12 @@ namespace ChatTCP.Server.Services
                         item =>
                             item.GroupId == groupId);
 
+
                 return group != null &&
                        group.HasMember(userId);
             }
         }
+
 
         public Group AddMember(
             int groupId,
@@ -195,16 +273,20 @@ namespace ChatTCP.Server.Services
                 requestedBy,
                 memberId);
 
+
             Group result;
+
 
             lock (groupLock)
             {
                 Group group =
                     FindGroupLocked(groupId);
 
+
                 EnsureOwner(
                     group,
                     requestedBy);
+
 
                 if (group.MemberIds
                     .Contains(memberId))
@@ -213,15 +295,20 @@ namespace ChatTCP.Server.Services
                         "Người dùng đã là thành viên của nhóm.");
                 }
 
+
                 group.MemberIds.Add(memberId);
+
 
                 result = CloneGroup(group);
             }
 
+
             GroupUpdated?.Invoke(result);
+
 
             return result;
         }
+
 
         public Group RemoveMember(
             int groupId,
@@ -233,16 +320,20 @@ namespace ChatTCP.Server.Services
                 requestedBy,
                 memberId);
 
+
             Group result;
+
 
             lock (groupLock)
             {
                 Group group =
                     FindGroupLocked(groupId);
 
+
                 EnsureOwner(
                     group,
                     requestedBy);
+
 
                 if (group.CreatedBy == memberId)
                 {
@@ -250,8 +341,10 @@ namespace ChatTCP.Server.Services
                         "Không thể xóa trưởng nhóm khỏi nhóm.");
                 }
 
+
                 bool removed =
                     group.MemberIds.Remove(memberId);
+
 
                 if (!removed)
                 {
@@ -259,13 +352,17 @@ namespace ChatTCP.Server.Services
                         "Người dùng không thuộc nhóm.");
                 }
 
+
                 result = CloneGroup(group);
             }
 
+
             GroupUpdated?.Invoke(result);
+
 
             return result;
         }
+
 
         public Group DissolveGroup(
             int groupId,
@@ -278,26 +375,34 @@ namespace ChatTCP.Server.Services
                     "Thông tin giải tán nhóm không hợp lệ.");
             }
 
+
             Group result;
+
 
             lock (groupLock)
             {
                 Group group =
                     FindGroupLocked(groupId);
 
+
                 EnsureOwner(
                     group,
                     requestedBy);
 
+
                 result = CloneGroup(group);
+
 
                 groups.Remove(group);
             }
 
+
             GroupDissolved?.Invoke(result);
+
 
             return result;
         }
+
 
         public Message HandleCreateGroupRequest(
             Message requestMessage)
@@ -309,7 +414,9 @@ namespace ChatTCP.Server.Services
                     "Tin nhắn không phải yêu cầu tạo nhóm.");
             }
 
+
             CreateGroupResponse response;
+
 
             try
             {
@@ -318,23 +425,28 @@ namespace ChatTCP.Server.Services
                         .Deserialize<CreateGroupRequest>(
                             requestMessage.Content);
 
+
                 if (request == null)
                 {
                     throw new ArgumentException(
                         "Dữ liệu tạo nhóm không hợp lệ.");
                 }
 
+
                 Group group = CreateGroup(
                     request.GroupName,
                     requestMessage.SenderId,
                     request.MemberIds);
 
+
                 response = new CreateGroupResponse
                 {
                     Success = true,
 
+
                     Message =
                         "Tạo nhóm thành công.",
+
 
                     Group = group
                 };
@@ -349,23 +461,29 @@ namespace ChatTCP.Server.Services
                 };
             }
 
+
             return new Message
             {
                 SenderId = 0,
                 SenderName = "Server",
 
+
                 ReceiverId =
                     requestMessage.SenderId,
+
 
                 Type =
                     MessageType.CreateGroupResponse,
 
+
                 Content =
                     JsonSerializer.Serialize(response),
+
 
                 Timestamp = DateTime.Now
             };
         }
+
 
         public Message HandleGetGroupListRequest(
             Message requestMessage)
@@ -377,28 +495,35 @@ namespace ChatTCP.Server.Services
                     "Tin nhắn không phải yêu cầu lấy danh sách nhóm.");
             }
 
+
             List<Group> userGroups =
                 GetGroupsForUser(
                     requestMessage.SenderId);
+
 
             return new Message
             {
                 SenderId = 0,
                 SenderName = "Server",
 
+
                 ReceiverId =
                     requestMessage.SenderId,
 
+
                 Type =
                     MessageType.GetGroupListResponse,
+
 
                 Content =
                     JsonSerializer.Serialize(
                         userGroups),
 
+
                 Timestamp = DateTime.Now
             };
         }
+
 
         private Group FindGroupLocked(
             int groupId)
@@ -409,10 +534,12 @@ namespace ChatTCP.Server.Services
                     "Mã nhóm không hợp lệ.");
             }
 
+
             Group? group =
                 groups.FirstOrDefault(
                     item =>
                         item.GroupId == groupId);
+
 
             if (group == null)
             {
@@ -420,8 +547,10 @@ namespace ChatTCP.Server.Services
                     "Không tìm thấy nhóm.");
             }
 
+
             return group;
         }
+
 
         private static void EnsureOwner(
             Group group,
@@ -433,6 +562,7 @@ namespace ChatTCP.Server.Services
                     "Chỉ trưởng nhóm mới được thực hiện thao tác này.");
             }
         }
+
 
         private static void ValidateManagementIds(
             int groupId,
@@ -448,6 +578,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         private static Group CloneGroup(
             Group source)
         {
@@ -458,9 +589,11 @@ namespace ChatTCP.Server.Services
                 CreatedBy = source.CreatedBy,
                 CreatedAt = source.CreatedAt,
 
+
                 MemberIds =
                     source.MemberIds.ToList()
             };
         }
     }
 }
+
