@@ -208,7 +208,6 @@ namespace ChatTCP.Server.Services
                     requestMessage.SenderId,
 
                 GroupId = groupId,
-
                 Type =
                     MessageType.GetChatHistoryResponse,
 
@@ -240,7 +239,10 @@ namespace ChatTCP.Server.Services
                     source.ReplyToSenderName,
 
                 ReplyToContent =
-                    source.ReplyToContent
+                    source.ReplyToContent,
+
+                IsForward =
+                    source.IsForward
             };
         }
     }
