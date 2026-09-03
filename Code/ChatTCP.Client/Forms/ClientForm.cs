@@ -104,7 +104,7 @@ namespace ChatTCP.Client.Forms
                 new Dictionary<string, ListViewItem>();
 
         // AVATAR & CHAT STATE
-        private Image? _defaultAvatar;
+        private Image? _myAvatar;
         private DateTime? _lastRenderedDate = null;
 
         // CONSTRUCTOR
@@ -142,7 +142,7 @@ namespace ChatTCP.Client.Forms
                     9F);
 
             // LOAD AVATAR
-            _defaultAvatar =
+            _myAvatar =
                 LoadAvatar(_currentUser.Avatar)
                 ?? LoadAvatar("avt1.png");
 
@@ -192,11 +192,11 @@ namespace ChatTCP.Client.Forms
                         BorderStyle.None
                 };
 
-            if (_defaultAvatar != null)
+            if (_myAvatar != null)
             {
                 picMyAvatar.Image =
                     new Bitmap(
-                        _defaultAvatar);
+                        _myAvatar);
             }
 
             MakeCircle(
@@ -381,6 +381,10 @@ namespace ChatTCP.Client.Forms
             lvUsers.MouseDown +=
                 LvUsers_MouseDown;
 
+            lvUsers.Click +=
+                (s, e) =>
+                    OpenChatWithUser();
+
             lvUsers.DoubleClick +=
                 (s, e) =>
                     OpenChatWithUser();
@@ -416,6 +420,10 @@ namespace ChatTCP.Client.Forms
             lvGroups.Columns.Add(
                 "Group",
                 216);
+
+            lvGroups.Click +=
+                (s, e) =>
+                    OpenChatWithGroup();
 
             lvGroups.DoubleClick +=
                 (s, e) =>
@@ -516,11 +524,12 @@ namespace ChatTCP.Client.Forms
                         BorderStyle.None
                 };
 
-            if (_defaultAvatar != null)
+            var initialChatAvatar = LoadAvatar("avt1.png");
+            if (initialChatAvatar != null)
             {
                 picChatAvatar.Image =
                     new Bitmap(
-                        _defaultAvatar);
+                        initialChatAvatar);
             }
 
             MakeCircle(
@@ -1077,11 +1086,18 @@ namespace ChatTCP.Client.Forms
 
             UpdateChatHeaderStatus(isTargetOnline);
 
-            if (_defaultAvatar != null)
+            Image? targetAvatar = null;
+            if (targetUser != null && !string.IsNullOrWhiteSpace(targetUser.Avatar))
+            {
+                targetAvatar = LoadAvatar(targetUser.Avatar);
+            }
+            targetAvatar ??= LoadAvatar("avt1.png");
+
+            if (targetAvatar != null)
             {
                 SetPictureBoxImage(
                     picChatAvatar,
-                    _defaultAvatar);
+                    targetAvatar);
             }
 
             // SESSION
@@ -1136,11 +1152,12 @@ namespace ChatTCP.Client.Forms
 
             UpdateChatHeaderStatus(false);
 
-            if (_defaultAvatar != null)
+            Image? groupAvatar = LoadAvatar("group.png") ?? LoadAvatar("avt2.png") ?? LoadAvatar("avt1.png");
+            if (groupAvatar != null)
             {
                 SetPictureBoxImage(
                     picChatAvatar,
-                    _defaultAvatar);
+                    groupAvatar);
             }
 
             int? groupId = null;
@@ -1829,6 +1846,15 @@ namespace ChatTCP.Client.Forms
                 if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
                 {
                     UpdateChatHeaderStatus(isOnline);
+
+                    if (userObj != null && !string.IsNullOrWhiteSpace(userObj.Avatar))
+                    {
+                        var avt = LoadAvatar(userObj.Avatar) ?? LoadAvatar("avt1.png");
+                        if (avt != null)
+                        {
+                            SetPictureBoxImage(picChatAvatar, avt);
+                        }
+                    }
                 }
 
                 return;
