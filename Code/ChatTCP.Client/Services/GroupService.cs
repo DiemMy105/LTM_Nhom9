@@ -105,7 +105,11 @@ namespace ChatTCP.Client.Services
 
         public void SendGroupMessage(
             int groupId,
-            string content)
+            string content,
+            int? replyToId = null,
+            string? replyToSenderName = null,
+            string? replyToContent = null,
+            bool isForward = false)
         {
             EnsureConnected();
 
@@ -137,7 +141,11 @@ namespace ChatTCP.Client.Services
                 GroupId = groupId,
                 Content = normalizedContent,
                 Type = MessageType.GroupChat,
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.Now,
+                ReplyToMessageId = replyToId,
+                ReplyToSenderName = replyToSenderName,
+                ReplyToContent = replyToContent,
+                IsForward = isForward
             };
 
             tcpClientManager.SendMessage(message);
