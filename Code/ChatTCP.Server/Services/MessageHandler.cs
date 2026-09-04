@@ -17,6 +17,10 @@ namespace ChatTCP.Server.Services
         private readonly GroupManager _groupManager;
         private readonly GroupMessageService _groupMessageService;
 
+        public event Action<User, ClientConnection>? UserLoggedIn;
+        public event Action<User>? UserRegistered;
+        public event Action<int, string>? UserLoggedOut;
+
         public MessageHandler(DatabaseService dbService, ClientManager clientManager, GroupManager groupManager)
         {
             _dbService = dbService;
@@ -81,6 +85,14 @@ namespace ChatTCP.Server.Services
                         HandleGetGroupList(msg, client);
                         break;
 
+                    case MessageType.GetUserListRequest:
+                        HandleGetUserList(msg, client);
+                        break;
+
+                    case MessageType.GetChatHistoryRequest:
+                        HandleGetChatHistory(msg, client);
+                        break;
+
                     default:
                         Console.WriteLine($"[MessageHandler] Chưa hỗ trợ loại tin nhắn: {msg.Type}");
                         break;
@@ -113,7 +125,7 @@ namespace ChatTCP.Server.Services
                 }
                 catch
                 {
-                 
+
                 }
             }
 
@@ -144,7 +156,27 @@ namespace ChatTCP.Server.Services
                 client.Username = user.Username;
                 _clientManager.AddClient(client);
 
+                UserLoggedIn?.Invoke(user, client);
+
                 Console.WriteLine($"[MessageHandler] Người dùng \"{user.Username}\" (ID: {user.UserId}) đã đăng nhập.");
+
+                // Thông báo tới các Client khác là user này vừa Online
+                var statusMsg = new Message
+                {
+                    SenderId = user.UserId,
+                    SenderName = user.Username,
+                    Type = MessageType.UserStatusUpdate,
+                    Content = JsonSerializer.Serialize(new User
+                    {
+                        UserId = user.UserId,
+                        Username = user.Username,
+                        DisplayName = user.DisplayName,
+                        Avatar = user.Avatar,
+                        Status = "Online"
+                    }),
+                    Timestamp = DateTime.Now
+                };
+                _clientManager.Broadcast(statusMsg, excludeUserId: user.UserId);
             }
             else
             {
@@ -207,8 +239,9 @@ namespace ChatTCP.Server.Services
                 Timestamp = DateTime.Now
             };
 
-            if (isSuccess)
+            if (isSuccess && registeredUser != null)
             {
+                UserRegistered?.Invoke(registeredUser);
                 Console.WriteLine($"[MessageHandler] Đăng ký thành công: \"{newUser.Username}\"");
             }
             else
@@ -224,24 +257,45 @@ namespace ChatTCP.Server.Services
         {
             if (client.UserId > 0)
             {
+                int loggedOutUserId = client.UserId;
+                string loggedOutUsername = client.Username ?? string.Empty;
+
                 _dbService.UpdateUserStatus(client.UserId, "Offline");
                 _clientManager.RemoveClient(client);
+
+                UserLoggedOut?.Invoke(loggedOutUserId, loggedOutUsername);
+
                 Console.WriteLine($"[MessageHandler] Người dùng ID {client.UserId} (\"{client.Username}\") đã đăng xuất.");
+
+                // Thông báo tới các Client khác là user này vừa Offline
+                var statusMsg = new Message
+                {
+                    SenderId = client.UserId,
+                    SenderName = client.Username ?? string.Empty,
+                    Type = MessageType.UserStatusUpdate,
+                    Content = JsonSerializer.Serialize(new User
+                    {
+                        UserId = client.UserId,
+                        Username = client.Username ?? string.Empty,
+                        Status = "Offline"
+                    }),
+                    Timestamp = DateTime.Now
+                };
+                _clientManager.Broadcast(statusMsg);
             }
         }
 
         // Chuyển tiếp tin nhắn chat 1-1 tới người nhận
         private void HandleDirectChat(Message msg, ClientConnection client)
         {
+            // Lưu tin nhắn vào CSDL
+            _dbService.SaveMessage(msg);
+
             bool isDelivered = false;
 
             if (msg.ReceiverId.HasValue && msg.ReceiverId.Value > 0)
             {
                 isDelivered = _clientManager.ForwardMessageToClient(msg.ReceiverId.Value, msg);
-            }
-            else if (!string.IsNullOrWhiteSpace(msg.SenderName))
-            {
-                isDelivered = _clientManager.ForwardMessageToClient(msg.SenderName, msg);
             }
 
             if (isDelivered)
@@ -250,7 +304,7 @@ namespace ChatTCP.Server.Services
             }
             else
             {
-                Console.WriteLine($"[MessageHandler] Người nhận (ID: {msg.ReceiverId}) hiện không online.");
+                Console.WriteLine($"[MessageHandler] Người nhận (ID: {msg.ReceiverId}) hiện không online hoặc không tồn tại.");
             }
         }
 
@@ -259,6 +313,9 @@ namespace ChatTCP.Server.Services
         {
             try
             {
+                // Lưu tin nhắn nhóm vào CSDL
+                _dbService.SaveMessage(msg);
+
                 var result = _groupMessageService.PrepareGroupMessage(msg);
                 int sentCount = 0;
 
@@ -286,6 +343,35 @@ namespace ChatTCP.Server.Services
                 Message response = _groupManager.HandleCreateGroupRequest(msg);
                 client.SendMessage(response);
                 Console.WriteLine($"[MessageHandler] Đã xử lý tạo nhóm từ User ID {msg.SenderId}");
+
+                // Gửi thông báo cập nhật nhóm tới tất cả các thành viên khác đang online
+                try
+                {
+                    var groupResponse = JsonSerializer.Deserialize<CreateGroupResponse>(response.Content);
+                    if (groupResponse != null && groupResponse.Success && groupResponse.Group != null)
+                    {
+                        foreach (int memberId in groupResponse.Group.MemberIds)
+                        {
+                            if (memberId != client.UserId && memberId > 0)
+                            {
+                                var memberNotice = new Message
+                                {
+                                    SenderId = 0,
+                                    SenderName = "Server",
+                                    ReceiverId = memberId,
+                                    Type = MessageType.CreateGroupResponse,
+                                    Content = response.Content,
+                                    Timestamp = DateTime.Now
+                                };
+                                _clientManager.ForwardMessageToClient(memberId, memberNotice);
+                            }
+                        }
+                    }
+                }
+                catch (Exception notifyEx)
+                {
+                    Console.WriteLine($"[MessageHandler] Lỗi gửi thông báo nhóm cho thành viên: {notifyEx.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -298,13 +384,134 @@ namespace ChatTCP.Server.Services
         {
             try
             {
-                Message response = _groupManager.HandleGetGroupListRequest(msg);
+                var userGroups = _dbService.GetGroupsForUser(client.UserId);
+                if ((userGroups == null || userGroups.Count == 0) && _groupManager != null)
+                {
+                    userGroups = _groupManager.GetGroupsForUser(client.UserId);
+                }
+
+                Message response = new Message
+                {
+                    SenderId = 0,
+                    SenderName = "Server",
+                    ReceiverId = client.UserId,
+                    Type = MessageType.GetGroupListResponse,
+                    Content = JsonSerializer.Serialize(userGroups ?? new List<Group>()),
+                    Timestamp = DateTime.Now
+                };
                 client.SendMessage(response);
-                Console.WriteLine($"[MessageHandler] Đã gửi danh sách nhóm cho User ID {msg.SenderId}");
+                Console.WriteLine($"[MessageHandler] Đã gửi danh sách {userGroups?.Count ?? 0} nhóm cho User ID {client.UserId}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[MessageHandler] Lỗi lấy danh sách nhóm: {ex.Message}");
+            }
+        }
+
+        // Xử lý lấy lịch sử tin nhắn (hỗ trợ cả Chat 1-1 và Chat Nhóm từ CSDL)
+        private void HandleGetChatHistory(Message msg, ClientConnection client)
+        {
+            try
+            {
+                if (msg.GroupId.HasValue && msg.GroupId.Value > 0)
+                {
+                    var messages = _dbService.GetGroupChatHistory(msg.GroupId.Value);
+                    var response = new GroupHistoryResponse
+                    {
+                        Success = true,
+                        Message = "Lấy lịch sử nhóm thành công.",
+                        GroupId = msg.GroupId.Value,
+                        Messages = messages
+                    };
+
+                    var responseMsg = new Message
+                    {
+                        SenderId = 0,
+                        SenderName = "Server",
+                        ReceiverId = client.UserId,
+                        GroupId = msg.GroupId.Value,
+                        Type = MessageType.GetChatHistoryResponse,
+                        Content = JsonSerializer.Serialize(response),
+                        Timestamp = DateTime.Now
+                    };
+                    client.SendMessage(responseMsg);
+                    Console.WriteLine($"[MessageHandler] Đã gửi lịch sử {messages.Count} tin nhắn nhóm ID {msg.GroupId.Value} cho User ID {client.UserId}");
+                }
+                else
+                {
+                    int partnerId = 0;
+                    string partnerUsername = msg.Content?.Trim() ?? string.Empty;
+
+                    if (msg.ReceiverId.HasValue && msg.ReceiverId.Value > 0)
+                    {
+                        partnerId = msg.ReceiverId.Value;
+                        var partnerUser = _dbService.GetUserById(partnerId);
+                        if (partnerUser != null)
+                        {
+                            partnerUsername = partnerUser.Username;
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(partnerUsername))
+                    {
+                        var partnerUser = _dbService.GetUserByUsername(partnerUsername);
+                        if (partnerUser != null)
+                        {
+                            partnerId = partnerUser.UserId;
+                        }
+                    }
+
+                    if (partnerId > 0 && client.UserId > 0)
+                    {
+                        var messages = _dbService.GetDirectChatHistory(client.UserId, partnerId);
+                        var responseMsg = new Message
+                        {
+                            SenderId = partnerId,
+                            SenderName = partnerUsername,
+                            ReceiverId = client.UserId,
+                            Type = MessageType.GetChatHistoryResponse,
+                            Content = JsonSerializer.Serialize(messages),
+                            Timestamp = DateTime.Now
+                        };
+                        client.SendMessage(responseMsg);
+                        Console.WriteLine($"[MessageHandler] Đã gửi lịch sử {messages.Count} tin nhắn 1-1 giữa User ID {client.UserId} và User ID {partnerId}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MessageHandler] Lỗi lấy lịch sử chat: {ex.Message}");
+            }
+        }
+
+        // Xử lý lấy toàn bộ danh sách người dùng trong CSDL
+        private void HandleGetUserList(Message msg, ClientConnection client)
+        {
+            try
+            {
+                var allUsers = _dbService.GetAllUsers();
+                foreach (var u in allUsers)
+                {
+                    bool isOnline = _clientManager.GetClient(u.UserId) != null;
+                    u.Status = isOnline ? "Online" : "Offline";
+                    u.Password = string.Empty; // Không gửi mật khẩu
+                }
+
+                Message response = new Message
+                {
+                    SenderId = 0,
+                    SenderName = "Server",
+                    ReceiverId = client.UserId,
+                    Type = MessageType.GetUserListResponse,
+                    Content = JsonSerializer.Serialize(allUsers),
+                    Timestamp = DateTime.Now
+                };
+
+                client.SendMessage(response);
+                Console.WriteLine($"[MessageHandler] Đã gửi danh sách {allUsers.Count} user trong CSDL cho User ID {client.UserId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MessageHandler] Lỗi lấy danh sách user: {ex.Message}");
             }
         }
 
