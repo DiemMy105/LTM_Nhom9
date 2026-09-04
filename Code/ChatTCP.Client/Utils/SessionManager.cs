@@ -239,6 +239,50 @@ namespace ChatTCP.Client.Utils
             MessageAdded?.Invoke(convKey, message, isCurrentChat);
         }
 
+        // Thêm tin nhắn 1-1 chỉ định rõ người nhận (dùng khi chuyển tiếp)
+        public void AddDirectMessage(string targetUsername, ChatMessage message)
+        {
+            if (message == null || string.IsNullOrWhiteSpace(targetUsername)) return;
+            string convKey = GetDirectChatKey(targetUsername);
+            bool isCurrentChat = !IsActiveChatGroup && string.Equals(ActiveChatTarget, targetUsername, StringComparison.OrdinalIgnoreCase);
+
+            lock (_historyLock)
+            {
+                var history = _chatHistories.GetOrAdd(convKey, _ => new List<ChatMessage>());
+                if (message.Id > 0 && history.Any(m => m.Id == message.Id))
+                {
+                    return;
+                }
+
+                history.Add(message);
+            }
+
+            MessageAdded?.Invoke(convKey, message, isCurrentChat);
+        }
+
+        // Thêm tin nhắn nhóm chỉ định rõ nhóm (dùng khi chuyển tiếp)
+        public void AddGroupMessage(string groupName, int? groupId, ChatMessage message)
+        {
+            if (message == null) return;
+            string convKey = groupId.HasValue && groupId.Value > 0 ? GetGroupKey(groupId.Value) : GetGroupKey(groupName);
+            bool isCurrentChat = IsActiveChatGroup && (
+                (groupId.HasValue && ActiveGroupId.HasValue && groupId.Value == ActiveGroupId.Value) ||
+                string.Equals(ActiveChatTarget, groupName, StringComparison.OrdinalIgnoreCase));
+
+            lock (_historyLock)
+            {
+                var history = _chatHistories.GetOrAdd(convKey, _ => new List<ChatMessage>());
+                if (message.Id > 0 && history.Any(m => m.Id == message.Id))
+                {
+                    return;
+                }
+
+                history.Add(message);
+            }
+
+            MessageAdded?.Invoke(convKey, message, isCurrentChat);
+        }
+
         // Gán lại toàn bộ lịch sử (từ Server trả về)
         public void SetHistory(string conversationKey, IEnumerable<ChatMessage> messages)
         {
