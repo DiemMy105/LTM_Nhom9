@@ -1,7 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using Microsoft.Data.SqlClient;
+using ChatTCP.Shared.Enums;
 using ChatTCP.Shared.Models;
 using ChatTCP.Server.Utils;
+using Message = ChatTCP.Shared.Models.Message;
 
 namespace ChatTCP.Server.Services
 {
@@ -12,7 +17,7 @@ namespace ChatTCP.Server.Services
 
         public DatabaseService(string? connectionString = null)
         {
-            _connectionString = connectionString 
+            _connectionString = connectionString
                 ?? @"Server=(localdb)\MSSQLLocalDB;Database=ChatTCP;Trusted_Connection=True;TrustServerCertificate=True;";
         }
 
@@ -238,7 +243,7 @@ namespace ChatTCP.Server.Services
             {
                 using var conn = GetConnection();
                 conn.Open();
-                string sql = "SELECT UserId, Username, DisplayName, Avatar, Status, CreatedAt FROM Users ORDER BY DisplayName ASC";
+                string sql = "SELECT UserId, Username, DisplayName, Avatar, Status, CreatedAt FROM Users ORDER BY UserId ASC";
                 using var cmd = new SqlCommand(sql, conn);
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
@@ -281,5 +286,339 @@ namespace ChatTCP.Server.Services
             cmd.Parameters.AddWithValue("@UserId", userId);
             return cmd.ExecuteNonQuery() > 0;
         }
+
+        // QUẢN LÝ TIN NHẮN (MESSAGES)
+
+        // Lưu tin nhắn vào CSDL (hỗ trợ cả Chat 1-1 và Nhóm, Reply, Forward)
+        public bool SaveMessage(Message msg)
+        {
+            if (msg == null || string.IsNullOrWhiteSpace(msg.Content) || msg.SenderId <= 0)
+                return false;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = @"
+                    INSERT INTO Messages (SenderId, ReceiverId, GroupId, Content, MessageType, ReplyToMessageId, IsForwarded, SentAt)
+                    VALUES (@SenderId, @ReceiverId, @GroupId, @Content, @MessageType, @ReplyToMessageId, @IsForwarded, @SentAt);
+                    SELECT SCOPE_IDENTITY();";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@SenderId", msg.SenderId);
+                cmd.Parameters.AddWithValue("@ReceiverId", (object?)msg.ReceiverId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@GroupId", (object?)msg.GroupId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@Content", msg.Content.Trim());
+                cmd.Parameters.AddWithValue("@MessageType", msg.Type.ToString());
+                cmd.Parameters.AddWithValue("@ReplyToMessageId", (object?)msg.ReplyToMessageId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@IsForwarded", msg.IsForward);
+                cmd.Parameters.AddWithValue("@SentAt", msg.Timestamp > DateTime.MinValue ? msg.Timestamp : DateTime.Now);
+
+                object newId = cmd.ExecuteScalar();
+                if (newId != null && int.TryParse(newId.ToString(), out int messageId))
+                {
+                    msg.Id = messageId;
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi lưu tin nhắn: {ex.Message}");
+            }
+            return false;
+        }
+
+        // Lấy lịch sử chat 1-1 giữa 2 người dùng
+        public List<Message> GetDirectChatHistory(int user1Id, int user2Id, int limit = 100)
+        {
+            var list = new List<Message>();
+            if (user1Id <= 0 || user2Id <= 0) return list;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = $@"
+                    SELECT TOP (@Limit)
+                        m.MessageId, m.SenderId, u.Username AS SenderName, m.ReceiverId, m.GroupId,
+                        m.Content, m.ReplyToMessageId, m.IsForwarded, m.SentAt,
+                        rm.Content AS ReplyContent, ru.Username AS ReplySenderName
+                    FROM Messages m
+                    INNER JOIN Users u ON m.SenderId = u.UserId
+                    LEFT JOIN Messages rm ON m.ReplyToMessageId = rm.MessageId
+                    LEFT JOIN Users ru ON rm.SenderId = ru.UserId
+                    WHERE m.GroupId IS NULL 
+                      AND ((m.SenderId = @User1 AND m.ReceiverId = @User2) OR (m.SenderId = @User2 AND m.ReceiverId = @User1))
+                    ORDER BY m.SentAt ASC";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@Limit", limit > 0 ? limit : 100);
+                cmd.Parameters.AddWithValue("@User1", user1Id);
+                cmd.Parameters.AddWithValue("@User2", user2Id);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(new Message
+                    {
+                        Id = reader.GetInt32(reader.GetOrdinal("MessageId")),
+                        SenderId = reader.GetInt32(reader.GetOrdinal("SenderId")),
+                        SenderName = reader.GetString(reader.GetOrdinal("SenderName")),
+                        ReceiverId = reader.IsDBNull(reader.GetOrdinal("ReceiverId")) ? null : reader.GetInt32(reader.GetOrdinal("ReceiverId")),
+                        GroupId = null,
+                        Content = reader.GetString(reader.GetOrdinal("Content")),
+                        Type = MessageType.DirectChat,
+                        ReplyToMessageId = reader.IsDBNull(reader.GetOrdinal("ReplyToMessageId")) ? null : reader.GetInt32(reader.GetOrdinal("ReplyToMessageId")),
+                        ReplyToSenderName = reader.IsDBNull(reader.GetOrdinal("ReplySenderName")) ? null : reader.GetString(reader.GetOrdinal("ReplySenderName")),
+                        ReplyToContent = reader.IsDBNull(reader.GetOrdinal("ReplyContent")) ? null : reader.GetString(reader.GetOrdinal("ReplyContent")),
+                        IsForward = !reader.IsDBNull(reader.GetOrdinal("IsForwarded")) && reader.GetBoolean(reader.GetOrdinal("IsForwarded")),
+                        Timestamp = reader.GetDateTime(reader.GetOrdinal("SentAt"))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi lấy lịch sử chat 1-1: {ex.Message}");
+            }
+            return list;
+        }
+
+        // Lấy lịch sử chat nhóm theo GroupId
+        public List<Message> GetGroupChatHistory(int groupId, int limit = 100)
+        {
+            var list = new List<Message>();
+            if (groupId <= 0) return list;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = $@"
+                    SELECT TOP (@Limit)
+                        m.MessageId, m.SenderId, u.Username AS SenderName, m.ReceiverId, m.GroupId,
+                        m.Content, m.ReplyToMessageId, m.IsForwarded, m.SentAt,
+                        rm.Content AS ReplyContent, ru.Username AS ReplySenderName
+                    FROM Messages m
+                    INNER JOIN Users u ON m.SenderId = u.UserId
+                    LEFT JOIN Messages rm ON m.ReplyToMessageId = rm.MessageId
+                    LEFT JOIN Users ru ON rm.SenderId = ru.UserId
+                    WHERE m.GroupId = @GroupId
+                    ORDER BY m.SentAt ASC";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@Limit", limit > 0 ? limit : 100);
+                cmd.Parameters.AddWithValue("@GroupId", groupId);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(new Message
+                    {
+                        Id = reader.GetInt32(reader.GetOrdinal("MessageId")),
+                        SenderId = reader.GetInt32(reader.GetOrdinal("SenderId")),
+                        SenderName = reader.GetString(reader.GetOrdinal("SenderName")),
+                        ReceiverId = null,
+                        GroupId = groupId,
+                        Content = reader.GetString(reader.GetOrdinal("Content")),
+                        Type = MessageType.GroupChat,
+                        ReplyToMessageId = reader.IsDBNull(reader.GetOrdinal("ReplyToMessageId")) ? null : reader.GetInt32(reader.GetOrdinal("ReplyToMessageId")),
+                        ReplyToSenderName = reader.IsDBNull(reader.GetOrdinal("ReplySenderName")) ? null : reader.GetString(reader.GetOrdinal("ReplySenderName")),
+                        ReplyToContent = reader.IsDBNull(reader.GetOrdinal("ReplyContent")) ? null : reader.GetString(reader.GetOrdinal("ReplyContent")),
+                        IsForward = !reader.IsDBNull(reader.GetOrdinal("IsForwarded")) && reader.GetBoolean(reader.GetOrdinal("IsForwarded")),
+                        Timestamp = reader.GetDateTime(reader.GetOrdinal("SentAt"))
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi lấy lịch sử chat nhóm: {ex.Message}");
+            }
+            return list;
+        }
+
+        // QUẢN LÝ NHÓM (GROUPS & GROUP MEMBERS)
+
+        // Tạo nhóm mới và lưu vào CSDL
+        public Group? CreateGroup(string groupName, int createdBy, List<int>? memberIds)
+        {
+            if (string.IsNullOrWhiteSpace(groupName) || createdBy <= 0) return null;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string insertGroupSql = @"
+                    INSERT INTO Groups (GroupName, CreatedBy, CreatedAt)
+                    VALUES (@GroupName, @CreatedBy, GETDATE());
+                    SELECT SCOPE_IDENTITY();";
+
+                using var cmd = new SqlCommand(insertGroupSql, conn);
+                cmd.Parameters.AddWithValue("@GroupName", groupName.Trim());
+                cmd.Parameters.AddWithValue("@CreatedBy", createdBy);
+
+                object newId = cmd.ExecuteScalar();
+                if (newId != null && int.TryParse(newId.ToString(), out int groupId))
+                {
+                    var allMemberIds = (memberIds ?? new List<int>()).Distinct().ToList();
+                    if (!allMemberIds.Contains(createdBy))
+                    {
+                        allMemberIds.Add(createdBy);
+                    }
+
+                    foreach (int mId in allMemberIds)
+                    {
+                        if (mId <= 0) continue;
+                        try
+                        {
+                            string insertMemberSql = "INSERT INTO GroupMembers (GroupId, UserId, JoinedAt) VALUES (@GroupId, @UserId, GETDATE())";
+                            using var mCmd = new SqlCommand(insertMemberSql, conn);
+                            mCmd.Parameters.AddWithValue("@GroupId", groupId);
+                            mCmd.Parameters.AddWithValue("@UserId", mId);
+                            mCmd.ExecuteNonQuery();
+                        }
+                        catch { }
+                    }
+
+                    return new Group
+                    {
+                        GroupId = groupId,
+                        GroupName = groupName.Trim(),
+                        CreatedBy = createdBy,
+                        CreatedAt = DateTime.Now,
+                        MemberIds = allMemberIds
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi tạo nhóm trong CSDL: {ex.Message}");
+            }
+            return null;
+        }
+
+        // Lấy danh sách các nhóm mà User tham gia
+        public List<Group> GetGroupsForUser(int userId)
+        {
+            var list = new List<Group>();
+            if (userId <= 0) return list;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = @"
+                    SELECT g.GroupId, g.GroupName, g.CreatedBy, g.CreatedAt
+                    FROM Groups g
+                    INNER JOIN GroupMembers gm ON g.GroupId = gm.GroupId
+                    WHERE gm.UserId = @UserId
+                    ORDER BY g.GroupName ASC";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@UserId", userId);
+
+                using var reader = cmd.ExecuteReader();
+                var groupRows = new List<(int GroupId, string GroupName, int CreatedBy, DateTime CreatedAt)>();
+                while (reader.Read())
+                {
+                    groupRows.Add((
+                        reader.GetInt32(reader.GetOrdinal("GroupId")),
+                        reader.GetString(reader.GetOrdinal("GroupName")),
+                        reader.IsDBNull(reader.GetOrdinal("CreatedBy")) ? 0 : reader.GetInt32(reader.GetOrdinal("CreatedBy")),
+                        reader.GetDateTime(reader.GetOrdinal("CreatedAt"))
+                    ));
+                }
+                reader.Close();
+
+                foreach (var row in groupRows)
+                {
+                    var group = new Group
+                    {
+                        GroupId = row.GroupId,
+                        GroupName = row.GroupName,
+                        CreatedBy = row.CreatedBy,
+                        CreatedAt = row.CreatedAt,
+                        MemberIds = new List<int>()
+                    };
+
+                    string memberSql = "SELECT UserId FROM GroupMembers WHERE GroupId = @GroupId";
+                    using var mCmd = new SqlCommand(memberSql, conn);
+                    mCmd.Parameters.AddWithValue("@GroupId", row.GroupId);
+                    using var mReader = mCmd.ExecuteReader();
+                    while (mReader.Read())
+                    {
+                        group.MemberIds.Add(mReader.GetInt32(0));
+                    }
+                    mReader.Close();
+
+                    list.Add(group);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi lấy danh sách nhóm của user: {ex.Message}");
+            }
+            return list;
+        }
+
+        // Lấy toàn bộ nhóm trong CSDL
+        public List<Group> GetAllGroups()
+        {
+            var list = new List<Group>();
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = "SELECT GroupId, GroupName, CreatedBy, CreatedAt FROM Groups ORDER BY GroupName ASC";
+                using var cmd = new SqlCommand(sql, conn);
+                using var reader = cmd.ExecuteReader();
+                var groupRows = new List<(int GroupId, string GroupName, int CreatedBy, DateTime CreatedAt)>();
+                while (reader.Read())
+                {
+                    groupRows.Add((
+                        reader.GetInt32(reader.GetOrdinal("GroupId")),
+                        reader.GetString(reader.GetOrdinal("GroupName")),
+                        reader.IsDBNull(reader.GetOrdinal("CreatedBy")) ? 0 : reader.GetInt32(reader.GetOrdinal("CreatedBy")),
+                        reader.GetDateTime(reader.GetOrdinal("CreatedAt"))
+                    ));
+                }
+                reader.Close();
+
+                foreach (var row in groupRows)
+                {
+                    var group = new Group
+                    {
+                        GroupId = row.GroupId,
+                        GroupName = row.GroupName,
+                        CreatedBy = row.CreatedBy,
+                        CreatedAt = row.CreatedAt,
+                        MemberIds = new List<int>()
+                    };
+
+                    string memberSql = "SELECT UserId FROM GroupMembers WHERE GroupId = @GroupId";
+                    using var mCmd = new SqlCommand(memberSql, conn);
+                    mCmd.Parameters.AddWithValue("@GroupId", row.GroupId);
+                    using var mReader = mCmd.ExecuteReader();
+                    while (mReader.Read())
+                    {
+                        group.MemberIds.Add(mReader.GetInt32(0));
+                    }
+                    mReader.Close();
+
+                    list.Add(group);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi lấy toàn bộ nhóm từ CSDL: {ex.Message}");
+            }
+            return list;
+        }
     }
 }
+
