@@ -565,6 +565,84 @@ namespace ChatTCP.Server.Services
             return list;
         }
 
+        public bool AddGroupMember(int groupId, int memberId)
+        {
+            if (groupId <= 0 || memberId <= 0) return false;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = @"
+                    IF NOT EXISTS (
+                        SELECT 1 FROM GroupMembers
+                        WHERE GroupId = @GroupId AND UserId = @UserId
+                    )
+                    BEGIN
+                        INSERT INTO GroupMembers (GroupId, UserId, JoinedAt)
+                        VALUES (@GroupId, @UserId, GETDATE())
+                    END";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@GroupId", groupId);
+                cmd.Parameters.AddWithValue("@UserId", memberId);
+                cmd.ExecuteNonQuery();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi thêm thành viên: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool RemoveGroupMember(int groupId, int memberId)
+        {
+            if (groupId <= 0 || memberId <= 0) return false;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = @"
+                    DELETE FROM GroupMembers
+                    WHERE GroupId = @GroupId AND UserId = @UserId";
+
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@GroupId", groupId);
+                cmd.Parameters.AddWithValue("@UserId", memberId);
+                return cmd.ExecuteNonQuery() > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi xóa thành viên: {ex.Message}");
+                return false;
+            }
+        }
+
+        public bool DeleteGroup(int groupId)
+        {
+            if (groupId <= 0) return false;
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+
+                string sql = "DELETE FROM Groups WHERE GroupId = @GroupId";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@GroupId", groupId);
+                return cmd.ExecuteNonQuery() > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DatabaseService] Lỗi giải tán nhóm: {ex.Message}");
+                return false;
+            }
+        }
+
         // Lấy toàn bộ nhóm trong CSDL
         public List<Group> GetAllGroups()
         {
@@ -621,4 +699,3 @@ namespace ChatTCP.Server.Services
         }
     }
 }
-

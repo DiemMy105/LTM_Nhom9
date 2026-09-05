@@ -26,6 +26,14 @@ namespace ChatTCP.Shared.Enums
         // System & Status
         UserStatusUpdate,
         SystemNotification,
-        Error
+        Error,
+
+        // Group management
+        AddGroupMemberRequest,
+        AddGroupMemberResponse,
+        RemoveGroupMemberRequest,
+        RemoveGroupMemberResponse,
+        DissolveGroupRequest,
+        DissolveGroupResponse
     }
 }
