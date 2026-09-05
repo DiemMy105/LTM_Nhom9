@@ -30,6 +30,10 @@ namespace ChatTCP.Client.Services
         public event Action<string>?
             GroupMessageFailed;
 
+        public event Action<Group>? GroupUpdated;
+        public event Action<int>? GroupDissolved;
+        public event Action<string>? GroupManagementFailed;
+
         public GroupService(
             TcpClientManager tcpClientManager,
             int currentUserId)
@@ -103,6 +107,69 @@ namespace ChatTCP.Client.Services
             tcpClientManager.SendMessage(message);
         }
 
+        public void RequestAddMember(int groupId, int memberId)
+        {
+            SendManagementRequest(
+                MessageType.AddGroupMemberRequest,
+                groupId,
+                memberId);
+        }
+
+        public void RequestRemoveMember(int groupId, int memberId)
+        {
+            SendManagementRequest(
+                MessageType.RemoveGroupMemberRequest,
+                groupId,
+                memberId);
+        }
+
+        public void RequestDissolveGroup(int groupId)
+        {
+            SendManagementRequest(
+                MessageType.DissolveGroupRequest,
+                groupId,
+                0);
+        }
+
+        private void SendManagementRequest(
+            MessageType type,
+            int groupId,
+            int memberId)
+        {
+            EnsureConnected();
+
+            if (groupId <= 0)
+            {
+                throw new ArgumentException(
+                    "Mã nhóm không hợp lệ.");
+            }
+
+            if (type != MessageType.DissolveGroupRequest &&
+                memberId <= 0)
+            {
+                throw new ArgumentException(
+                    "Thành viên không hợp lệ.");
+            }
+
+            GroupManagementRequest request =
+                new GroupManagementRequest
+                {
+                    GroupId = groupId,
+                    MemberId = memberId
+                };
+
+            tcpClientManager.SendMessage(
+                new Message
+                {
+                    SenderId = CurrentUserId,
+                    GroupId = groupId,
+                    Type = type,
+                    Content =
+                        JsonSerializer.Serialize(request),
+                    Timestamp = DateTime.Now
+                });
+        }
+
         public void SendGroupMessage(
             int groupId,
             string content,
@@ -167,6 +234,64 @@ namespace ChatTCP.Client.Services
                 case MessageType.GroupChat:
                     HandleGroupMessage(message);
                     break;
+
+                case MessageType.AddGroupMemberResponse:
+                case MessageType.RemoveGroupMemberResponse:
+                case MessageType.DissolveGroupResponse:
+                    HandleGroupManagementResponse(message);
+                    break;
+            }
+        }
+
+        private void HandleGroupManagementResponse(
+            Message message)
+        {
+            try
+            {
+                GroupManagementResponse? response =
+                    JsonSerializer
+                        .Deserialize<GroupManagementResponse>(
+                            message.Content);
+
+                if (response == null)
+                {
+                    GroupManagementFailed?.Invoke(
+                        "Server trả về dữ liệu không hợp lệ.");
+                    return;
+                }
+
+                if (!response.Success)
+                {
+                    GroupManagementFailed?.Invoke(
+                        response.Message);
+                    return;
+                }
+
+                if (message.Type ==
+                    MessageType.DissolveGroupResponse)
+                {
+                    int groupId =
+                        response.Group?.GroupId
+                        ?? message.GroupId
+                        ?? 0;
+
+                    if (groupId > 0)
+                    {
+                        GroupDissolved?.Invoke(groupId);
+                    }
+
+                    return;
+                }
+
+                if (response.Group != null)
+                {
+                    GroupUpdated?.Invoke(response.Group);
+                }
+            }
+            catch (JsonException)
+            {
+                GroupManagementFailed?.Invoke(
+                    "Không đọc được kết quả quản lý nhóm.");
             }
         }
 

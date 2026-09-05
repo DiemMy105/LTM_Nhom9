@@ -295,6 +295,12 @@ namespace ChatTCP.Server.Services
                         "Người dùng đã là thành viên của nhóm.");
                 }
 
+                if (_dbService != null &&
+                    !_dbService.AddGroupMember(groupId, memberId))
+                {
+                    throw new InvalidOperationException(
+                        "Không thể lưu thành viên vào cơ sở dữ liệu.");
+                }
 
                 group.MemberIds.Add(memberId);
 
@@ -341,17 +347,20 @@ namespace ChatTCP.Server.Services
                         "Không thể xóa trưởng nhóm khỏi nhóm.");
                 }
 
-
-                bool removed =
-                    group.MemberIds.Remove(memberId);
-
-
-                if (!removed)
+                if (!group.MemberIds.Contains(memberId))
                 {
                     throw new InvalidOperationException(
                         "Người dùng không thuộc nhóm.");
                 }
 
+                if (_dbService != null &&
+                    !_dbService.RemoveGroupMember(groupId, memberId))
+                {
+                    throw new InvalidOperationException(
+                        "Không thể xóa thành viên khỏi cơ sở dữ liệu.");
+                }
+
+                group.MemberIds.Remove(memberId);
 
                 result = CloneGroup(group);
             }
@@ -392,6 +401,12 @@ namespace ChatTCP.Server.Services
 
                 result = CloneGroup(group);
 
+                if (_dbService != null &&
+                    !_dbService.DeleteGroup(groupId))
+                {
+                    throw new InvalidOperationException(
+                        "Không thể xóa nhóm khỏi cơ sở dữ liệu.");
+                }
 
                 groups.Remove(group);
             }
@@ -596,4 +611,3 @@ namespace ChatTCP.Server.Services
         }
     }
 }
-
