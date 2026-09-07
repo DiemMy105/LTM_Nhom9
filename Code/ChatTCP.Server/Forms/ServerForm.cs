@@ -947,14 +947,15 @@ namespace ChatTCP.Server.Forms
 
                 _isRunning = true;
 
+                // Ghi nhớ cấu hình port cho các lần khởi động sau
+                NetworkConfig.ServerPort = port;
+                NetworkConfig.Save();
 
                 btnStart.Enabled = false;
                 btnStop.Enabled = true;
 
-
                 numPort.Enabled = false;
                 btnRefreshIp.Enabled = false;
-
 
                 lblServerStatus.Text = "● Server: Online";
                 lblServerStatus.ForeColor = Color.LimeGreen;
