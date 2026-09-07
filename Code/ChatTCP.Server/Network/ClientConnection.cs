@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using ChatTCP.Shared.Models;
 using ChatTCP.Shared.Network;
+using ChatTCP.Shared.Utils;
 using Message = ChatTCP.Shared.Models.Message;
 
 namespace ChatTCP.Server.Network
@@ -33,6 +34,8 @@ namespace ChatTCP.Server.Network
         public ClientConnection(TcpClient client)
         {
             this.client = client;
+            this.client.ReceiveBufferSize = NetworkConfig.BufferSize;
+            this.client.SendBufferSize = NetworkConfig.BufferSize;
             stream = client.GetStream();
 
             try
@@ -52,7 +55,8 @@ namespace ChatTCP.Server.Network
         {
             try
             {
-                byte[] buffer = new byte[4096];
+                int bufSize = NetworkConfig.BufferSize > 0 ? NetworkConfig.BufferSize : 8192;
+                byte[] buffer = new byte[bufSize];
                 string receivedData = "";
 
                 while (IsConnected)

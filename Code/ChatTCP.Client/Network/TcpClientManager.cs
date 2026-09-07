@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using ChatTCP.Shared.Models;
 using ChatTCP.Shared.Network;
+using ChatTCP.Shared.Utils;
 using Message = ChatTCP.Shared.Models.Message;
 
 namespace ChatTCP.Client.Network
@@ -27,8 +28,29 @@ namespace ChatTCP.Client.Network
         {
             try
             {
+                Disconnect();
+
                 client = new TcpClient();
-                client.Connect(ip, port);
+                client.ReceiveBufferSize = NetworkConfig.BufferSize;
+                client.SendBufferSize = NetworkConfig.BufferSize;
+                client.SendTimeout = NetworkConfig.Settings.SendTimeoutMs;
+                client.ReceiveTimeout = NetworkConfig.Settings.ReceiveTimeoutMs;
+
+                // Kết nối với Timeout cấu hình được
+                int timeoutMs = NetworkConfig.ConnectTimeoutMs > 0 ? NetworkConfig.ConnectTimeoutMs : 5000;
+                var connectTask = client.ConnectAsync(ip, port);
+                if (!connectTask.Wait(timeoutMs))
+                {
+                    Disconnect();
+                    return false;
+                }
+
+                if (!client.Connected)
+                {
+                    Disconnect();
+                    return false;
+                }
+
                 stream = client.GetStream();
                 receiveThread = new Thread(ReceiveData);
                 receiveThread.IsBackground = true;
@@ -37,6 +59,7 @@ namespace ChatTCP.Client.Network
             }
             catch
             {
+                Disconnect();
                 return false;
             }
         }
@@ -63,7 +86,8 @@ namespace ChatTCP.Client.Network
         {
             if (stream == null)
                 return;
-            byte[] buffer = new byte[4096];
+            int bufSize = NetworkConfig.BufferSize > 0 ? NetworkConfig.BufferSize : 8192;
+            byte[] buffer = new byte[bufSize];
             string receivedData = "";
 
             try

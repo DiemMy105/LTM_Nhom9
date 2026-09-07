@@ -12,6 +12,8 @@ namespace ChatTCP.Client.Forms
         // AUTH SERVICE
         private readonly AuthService authService;
         // CONTROLS
+        private TextBox txtServerIp = null!;
+        private NumericUpDown numServerPort = null!;
         private TextBox txtUsername = null!;
         private TextBox txtPassword = null!;
         private CheckBox chkShowPassword = null!;
@@ -37,7 +39,7 @@ namespace ChatTCP.Client.Forms
         {
             // FORM
             Text = "Chat TCP - Đăng nhập";
-            ClientSize = new Size(400, 480);
+            ClientSize = new Size(420, 560);
             StartPosition =
                 FormStartPosition.CenterScreen;
             FormBorderStyle =
@@ -53,27 +55,26 @@ namespace ChatTCP.Client.Forms
             // TITLE
             Label lblTitle =
                 new Label();
-            // Đã sửa: ChatTCP -> Chat TCP
             lblTitle.Text = "Chat TCP";
             lblTitle.Location =
                 new Point(
                     0,
-                    30);
+                    18);
             lblTitle.Size =
                 new Size(
-                    400,
-                    50);
+                    420,
+                    45);
             lblTitle.TextAlign =
                 ContentAlignment.MiddleCenter;
             lblTitle.ForeColor =
                 Color.FromArgb(
                     30,
-                    90,
+                    71,
                     180);
             lblTitle.Font =
                 new Font(
                     "Segoe UI",
-                    22F,
+                    20F,
                     FontStyle.Bold);
             // SUBTITLE
             Label lblSubtitle =
@@ -83,11 +84,11 @@ namespace ChatTCP.Client.Forms
             lblSubtitle.Location =
                 new Point(
                     0,
-                    82);
+                    65);
             lblSubtitle.Size =
                 new Size(
-                    400,
-                    28);
+                    420,
+                    24);
             lblSubtitle.TextAlign =
                 ContentAlignment.MiddleCenter;
             lblSubtitle.ForeColor =
@@ -95,7 +96,40 @@ namespace ChatTCP.Client.Forms
             lblSubtitle.Font =
                 new Font(
                     "Segoe UI",
-                    9.5F);
+                    9F);
+
+            // SERVER IP LABEL
+            Label lblServerIp = new Label();
+            lblServerIp.Text = "Địa chỉ Server (IP/Host):";
+            lblServerIp.Location = new Point(45, 98);
+            lblServerIp.Size = new Size(210, 20);
+            lblServerIp.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            lblServerIp.ForeColor = Color.FromArgb(60, 60, 60);
+
+            // SERVER IP TEXTBOX
+            txtServerIp = new TextBox();
+            txtServerIp.Location = new Point(45, 120);
+            txtServerIp.Size = new Size(210, 27);
+            txtServerIp.Font = new Font("Segoe UI", 9.5F);
+            txtServerIp.Text = NetworkConfig.ServerIp;
+
+            // SERVER PORT LABEL
+            Label lblServerPort = new Label();
+            lblServerPort.Text = "Port:";
+            lblServerPort.Location = new Point(270, 98);
+            lblServerPort.Size = new Size(105, 20);
+            lblServerPort.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            lblServerPort.ForeColor = Color.FromArgb(60, 60, 60);
+
+            // SERVER PORT NUMERIC
+            numServerPort = new NumericUpDown();
+            numServerPort.Location = new Point(270, 120);
+            numServerPort.Size = new Size(105, 27);
+            numServerPort.Minimum = 1024;
+            numServerPort.Maximum = 65535;
+            numServerPort.Value = NetworkConfig.ServerPort >= 1024 && NetworkConfig.ServerPort <= 65535 ? NetworkConfig.ServerPort : 8888;
+            numServerPort.Font = new Font("Segoe UI", 9.5F);
+
             // USERNAME LABEL
             Label lblUsername =
                 new Label();
@@ -104,11 +138,11 @@ namespace ChatTCP.Client.Forms
             lblUsername.Location =
                 new Point(
                     45,
-                    125);
+                    158);
             lblUsername.Size =
                 new Size(
-                    310,
-                    24);
+                    330,
+                    20);
             lblUsername.Font =
                 new Font(
                     "Segoe UI",
@@ -119,11 +153,11 @@ namespace ChatTCP.Client.Forms
             txtUsername.Location =
                 new Point(
                     45,
-                    150);
+                    180);
             txtUsername.Size =
                 new Size(
-                    310,
-                    30);
+                    330,
+                    28);
             txtUsername.MaxLength =
                 50;
             txtUsername.Font =
@@ -138,11 +172,11 @@ namespace ChatTCP.Client.Forms
             lblPassword.Location =
                 new Point(
                     45,
-                    195);
+                    218);
             lblPassword.Size =
                 new Size(
-                    310,
-                    24);
+                    330,
+                    20);
             lblPassword.Font =
                 new Font(
                     "Segoe UI",
@@ -153,11 +187,11 @@ namespace ChatTCP.Client.Forms
             txtPassword.Location =
                 new Point(
                     45,
-                    220);
+                    240);
             txtPassword.Size =
                 new Size(
-                    310,
-                    30);
+                    330,
+                    28);
             txtPassword.MaxLength =
                 100;
             // Ẩn mật khẩu mặc định
@@ -170,20 +204,18 @@ namespace ChatTCP.Client.Forms
             // SHOW PASSWORD
             chkShowPassword =
                 new CheckBox();
-            // Đã sửa thành đầy đủ
             chkShowPassword.Text =
                 "Hiện mật khẩu";
             chkShowPassword.Location =
                 new Point(
                     45,
-                    260);
-            // Cho tự động giãn theo chữ
+                    276);
             chkShowPassword.AutoSize =
                 true;
             chkShowPassword.Font =
                 new Font(
                     "Segoe UI",
-                    9F);
+                    8.5F);
             chkShowPassword.Margin =
                 new Padding(0);
             chkShowPassword.Padding =
@@ -199,11 +231,11 @@ namespace ChatTCP.Client.Forms
             lblStatus.Location =
                 new Point(
                     45,
-                    290);
+                    305);
             lblStatus.Size =
                 new Size(
-                    310,
-                    30);
+                    330,
+                    45);
             lblStatus.TextAlign =
                 ContentAlignment.MiddleLeft;
             lblStatus.ForeColor =
@@ -220,11 +252,11 @@ namespace ChatTCP.Client.Forms
             btnLogin.Location =
                 new Point(
                     45,
-                    330);
+                    360);
             btnLogin.Size =
                 new Size(
-                    310,
-                    40);
+                    330,
+                    42);
             btnLogin.BackColor =
                 Color.FromArgb(
                     30,
@@ -255,10 +287,10 @@ namespace ChatTCP.Client.Forms
             lnkRegister.Location =
                 new Point(
                     0,
-                    390);
+                    420);
             lnkRegister.Size =
                 new Size(
-                    400,
+                    420,
                     30);
             lnkRegister.TextAlign =
                 ContentAlignment.MiddleCenter;
@@ -278,6 +310,10 @@ namespace ChatTCP.Client.Forms
             // ADD CONTROLS
             Controls.Add(lblTitle);
             Controls.Add(lblSubtitle);
+            Controls.Add(lblServerIp);
+            Controls.Add(txtServerIp);
+            Controls.Add(lblServerPort);
+            Controls.Add(numServerPort);
             Controls.Add(lblUsername);
             Controls.Add(txtUsername);
             Controls.Add(lblPassword);
@@ -357,9 +393,6 @@ namespace ChatTCP.Client.Forms
                     await EnsureConnectedAsync();
                 if (!connected)
                 {
-                    ShowStatus(
-                        "Không thể kết nối tới Server. " +
-                        "Kiểm tra lại IP/Port.");
                     btnLogin.Enabled =
                         true;
                     return;
@@ -387,18 +420,12 @@ namespace ChatTCP.Client.Forms
         {
             lnkRegister.Enabled =
                 false;
-            ShowStatus(
-                "Đang kết nối tới Server...",
-                false);
             try
             {
                 bool connected =
                     await EnsureConnectedAsync();
                 if (!connected)
                 {
-                    ShowStatus(
-                        "Không thể kết nối tới Server. " +
-                        "Kiểm tra lại IP/Port.");
                     return;
                 }
                 ShowStatus("");
@@ -424,18 +451,48 @@ namespace ChatTCP.Client.Forms
         // ENSURE CONNECTION
         private async Task<bool> EnsureConnectedAsync()
         {
-            if (authService.IsConnected)
+            string ip = txtServerIp.Text.Trim();
+            int port = (int)numServerPort.Value;
+
+            if (string.IsNullOrWhiteSpace(ip))
+            {
+                ShowStatus("Vui lòng nhập địa chỉ IP/Host của Server.");
+                txtServerIp.Focus();
+                return false;
+            }
+
+            // Nếu đã kết nối với cùng cấu hình
+            if (authService.IsConnected && NetworkConfig.ServerIp == ip && NetworkConfig.ServerPort == port)
             {
                 return true;
             }
+
+            // Nếu đổi IP/Port khác trong khi đang kết nối, ngắt kết nối cũ
+            if (authService.IsConnected && (NetworkConfig.ServerIp != ip || NetworkConfig.ServerPort != port))
+            {
+                authService.Connection.Disconnect();
+            }
+
+            // Lưu cấu hình vào file để lần sau dùng lại
+            NetworkConfig.ServerIp = ip;
+            NetworkConfig.ServerPort = port;
+            NetworkConfig.Save();
+
             ShowStatus(
-                "Đang kết nối tới Server...",
+                $"Đang kết nối tới Server {ip}:{port}...",
                 false);
-            return await Task.Run(
-                () =>
-                    authService.Connect(
-                        NetworkConfig.ServerIp,
-                        NetworkConfig.ServerPort));
+
+            bool connected = await Task.Run(
+                () => authService.Connect(ip, port));
+
+            if (!connected)
+            {
+                ShowStatus(
+                    $"Không thể kết nối tới {ip}:{port}.\nKiểm tra lại IP, Port và tường lửa (Firewall).",
+                    true);
+            }
+
+            return connected;
         }
         // LOGIN SUCCESS
         private void OnLoginSucceeded(
