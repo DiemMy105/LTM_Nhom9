@@ -456,7 +456,7 @@ namespace ChatTCP.Client.Forms
             btnGroupMembers =
                 new Button
                 {
-                    Text = "👥",
+                    Text = " ≡ ",
                     Dock = DockStyle.Right,
                     Width = 52,
                     FlatStyle = FlatStyle.Flat,
