@@ -58,6 +58,7 @@ namespace ChatTCP.Client.Forms
         private PictureBox picChatAvatar = null!;
         private Label lblChatTarget = null!;
         private Label lblChatStatus = null!;
+        private Button btnGroupMembers = null!;
         private Panel pnlMessages = null!;
         private FlowLayoutPanel flpMessages = null!;
         private Panel pnlReplyPreview = null!;
@@ -451,12 +452,31 @@ namespace ChatTCP.Client.Forms
                             "Segoe UI",
                             8F)
                 };
+
+            btnGroupMembers =
+                new Button
+                {
+                    Text = " ≡ ",
+                    Dock = DockStyle.Right,
+                    Width = 52,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font(
+                        "Segoe UI Emoji",
+                        12F),
+                    Cursor = Cursors.Hand,
+                    Visible = false
+                };
+            btnGroupMembers.FlatAppearance.BorderSize = 0;
+            btnGroupMembers.Click +=
+                BtnGroupMembers_Click;
+
             pnlChatHeader.Controls.AddRange(
                 new Control[]
                 {
                     picChatAvatar,
                     lblChatTarget,
-                    lblChatStatus
+                    lblChatStatus,
+                    btnGroupMembers
                 });
             // MESSAGE PANEL
             pnlMessages =
@@ -758,6 +778,10 @@ namespace ChatTCP.Client.Forms
                 OnGroupCreated;
             _groupService.GroupMessageReceived +=
                 OnGroupMessageReceived;
+            _groupService.GroupUpdated +=
+                OnGroupChanged;
+            _groupService.GroupDissolved +=
+                OnGroupDissolved;
             _groupService.RequestGroupList();
             // EMOJI SERVICE
             _emojiService =
@@ -813,6 +837,7 @@ namespace ChatTCP.Client.Forms
                 username;
             _activeChatIsGroup =
                 false;
+            btnGroupMembers.Visible = false;
             // HEADER
             lblChatTarget.Text =
                 username;
@@ -869,6 +894,7 @@ namespace ChatTCP.Client.Forms
                 groupName;
             _activeChatIsGroup =
                 true;
+            btnGroupMembers.Visible = true;
             lblChatTarget.Text =
                 groupName;
             UpdateChatHeaderStatus(false);
@@ -905,6 +931,34 @@ namespace ChatTCP.Client.Forms
             }
             ScrollMessagesToBottom();
         }
+
+        private void BtnGroupMembers_Click(
+            object? sender,
+            EventArgs e)
+        {
+            if (!_activeChatIsGroup ||
+                _groupService == null ||
+                !_groupsByName.TryGetValue(
+                    _activeChatTarget,
+                    out Group? group))
+            {
+                return;
+            }
+
+            List<User> users =
+                _onlineUsersByName.Values
+                    .Append(_currentUser)
+                    .ToList();
+
+            using var form =
+                new GroupMembersForm(
+                    group,
+                    users,
+                    _groupService);
+
+            form.ShowDialog(this);
+        }
+
         // CREATE GROUP
         private void BtnCreateGroup_Click(
             object? sender,
@@ -1520,6 +1574,8 @@ namespace ChatTCP.Client.Forms
             }
             if (_groupItems.ContainsKey(groupName))
             {
+                _groupItems[groupName].Tag =
+                    _groupsByName[groupName];
                 return;
             }
             var item =
@@ -1558,6 +1614,69 @@ namespace ChatTCP.Client.Forms
                     group);
             });
         }
+
+        private void OnGroupChanged(Group group)
+        {
+            InvokeIfRequired(() =>
+            {
+                if (!group.MemberIds.Contains(
+                    _currentUser.UserId))
+                {
+                    RemoveGroupFromClient(group.GroupId);
+                    return;
+                }
+
+                _groupsByName[group.GroupName] = group;
+                AddGroupToList(
+                    group.GroupName,
+                    group);
+            });
+        }
+
+        private void OnGroupDissolved(int groupId)
+        {
+            InvokeIfRequired(() =>
+                RemoveGroupFromClient(groupId));
+        }
+
+        private void RemoveGroupFromClient(int groupId)
+        {
+            var pair = _groupsByName.FirstOrDefault(
+                item => item.Value.GroupId == groupId);
+
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                return;
+            }
+
+            string groupName = pair.Key;
+
+            if (_groupItems.TryGetValue(
+                groupName,
+                out ListViewItem? item))
+            {
+                lvGroups.Items.Remove(item);
+                _groupItems.Remove(groupName);
+            }
+
+            _groupsByName.Remove(groupName);
+
+            if (_activeChatIsGroup &&
+                string.Equals(
+                    _activeChatTarget,
+                    groupName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _activeChatTarget = string.Empty;
+                _activeChatIsGroup = false;
+                lblChatTarget.Text =
+                    "Chọn một cuộc trò chuyện";
+                lblChatStatus.Text = string.Empty;
+                btnGroupMembers.Visible = false;
+                flpMessages.Controls.Clear();
+            }
+        }
+
         private void OnGroupMessageReceived(
             ChatMessage message)
         {

@@ -85,6 +85,12 @@ namespace ChatTCP.Server.Services
                         HandleGetGroupList(msg, client);
                         break;
 
+                    case MessageType.AddGroupMemberRequest:
+                    case MessageType.RemoveGroupMemberRequest:
+                    case MessageType.DissolveGroupRequest:
+                        HandleGroupManagement(msg, client);
+                        break;
+
                     case MessageType.GetUserListRequest:
                         HandleGetUserList(msg, client);
                         break;
@@ -377,6 +383,134 @@ namespace ChatTCP.Server.Services
             {
                 Console.WriteLine($"[MessageHandler] Lỗi tạo nhóm: {ex.Message}");
             }
+        }
+
+        private void HandleGroupManagement(
+            Message msg,
+            ClientConnection client)
+        {
+            int groupId = 0;
+            var recipients = new HashSet<int>();
+            MessageType responseType =
+                msg.Type == MessageType.AddGroupMemberRequest
+                    ? MessageType.AddGroupMemberResponse
+                    : msg.Type == MessageType.RemoveGroupMemberRequest
+                        ? MessageType.RemoveGroupMemberResponse
+                        : MessageType.DissolveGroupResponse;
+
+            GroupManagementResponse response;
+
+            try
+            {
+                if (client.UserId <= 0)
+                {
+                    throw new InvalidOperationException(
+                        "Bạn chưa đăng nhập.");
+                }
+
+                GroupManagementRequest? request =
+                    JsonSerializer.Deserialize<GroupManagementRequest>(
+                        msg.Content);
+
+                if (request == null)
+                {
+                    throw new InvalidOperationException(
+                        "Dữ liệu quản lý nhóm không hợp lệ.");
+                }
+
+                groupId = request.GroupId;
+                Group group;
+
+                if (msg.Type == MessageType.AddGroupMemberRequest)
+                {
+                    group = _groupManager.AddMember(
+                        request.GroupId,
+                        client.UserId,
+                        request.MemberId);
+
+                    foreach (int id in group.MemberIds)
+                    {
+                        recipients.Add(id);
+                    }
+                }
+                else if (msg.Type == MessageType.RemoveGroupMemberRequest)
+                {
+                    foreach (int id in
+                        _groupManager.GetMemberIds(request.GroupId))
+                    {
+                        recipients.Add(id);
+                    }
+
+                    group = _groupManager.RemoveMember(
+                        request.GroupId,
+                        client.UserId,
+                        request.MemberId);
+                }
+                else
+                {
+                    foreach (int id in
+                        _groupManager.GetMemberIds(request.GroupId))
+                    {
+                        recipients.Add(id);
+                    }
+
+                    group = _groupManager.DissolveGroup(
+                        request.GroupId,
+                        client.UserId);
+                }
+
+                response = new GroupManagementResponse
+                {
+                    Success = true,
+                    Message = "Cập nhật nhóm thành công.",
+                    Group = group
+                };
+            }
+            catch (Exception ex)
+            {
+                response = new GroupManagementResponse
+                {
+                    Success = false,
+                    Message = ex.Message,
+                    Group = null
+                };
+            }
+
+            Message responseMessage = new Message
+            {
+                SenderId = 0,
+                SenderName = "Server",
+                ReceiverId = client.UserId,
+                GroupId = groupId,
+                Type = responseType,
+                Content = JsonSerializer.Serialize(response),
+                Timestamp = DateTime.Now
+            };
+
+            if (!response.Success)
+            {
+                client.SendMessage(responseMessage);
+                return;
+            }
+
+            foreach (int recipientId in recipients)
+            {
+                responseMessage.ReceiverId = recipientId;
+
+                if (recipientId == client.UserId)
+                {
+                    client.SendMessage(responseMessage);
+                }
+                else
+                {
+                    _clientManager.ForwardMessageToClient(
+                        recipientId,
+                        responseMessage);
+                }
+            }
+
+            Console.WriteLine(
+                $"[MessageHandler] Đã cập nhật nhóm ID {groupId}.");
         }
 
         // Xử lý lấy danh sách nhóm của người dùng
