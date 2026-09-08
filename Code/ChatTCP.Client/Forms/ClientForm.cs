@@ -728,11 +728,11 @@ namespace ChatTCP.Client.Forms
             pnlChat.Controls.Add(
                 pnlMessages);
             pnlChat.Controls.Add(
-                pnlEmoji);
-            pnlChat.Controls.Add(
                 pnlReplyPreview);
             pnlChat.Controls.Add(
                 pnlInput);
+            pnlChat.Controls.Add(
+                pnlEmoji);
             pnlChat.Controls.Add(
                 pnlChatHeader);
             Controls.Add(
@@ -771,7 +771,8 @@ namespace ChatTCP.Client.Forms
             _groupService =
                 new GroupService(
                     _tcpClient,
-                    _currentUser.UserId);
+                    _currentUser.UserId,
+                    _currentUsername);
             _groupService.GroupListReceived +=
                 OnGroupListReceived;
             _groupService.GroupCreated +=
@@ -1092,7 +1093,8 @@ namespace ChatTCP.Client.Forms
                         content,
                         replyToId: message.ReplyToMessageId,
                         replyToSenderName: message.ReplyToSenderName,
-                        replyToContent: message.ReplyToContent);
+                        replyToContent: message.ReplyToContent,
+                        senderName: _currentUsername);
                 }
                 else
                 {
@@ -1144,24 +1146,26 @@ namespace ChatTCP.Client.Forms
             }
             try
             {
-                _emojiPicker = new EmojiPickerForm
+                if (_emojiPicker == null || _emojiPicker.IsDisposed)
                 {
-                    TopLevel = false,
-                    FormBorderStyle = FormBorderStyle.None,
-                    Dock = DockStyle.Fill,
-                    ShowInTaskbar = false
-                };
-                _emojiPicker.EmojiSelected += (emoji) =>
-                {
-                    InsertEmoji(emoji);
-                };
-                _emojiPicker.FormClosed += EmojiPicker_FormClosed;
-                pnlEmoji.Controls.Clear();
-                pnlEmoji.Controls.Add(_emojiPicker);
+                    _emojiPicker = new EmojiPickerForm
+                    {
+                        TopLevel = false,
+                        FormBorderStyle = FormBorderStyle.None,
+                        Dock = DockStyle.Fill,
+                        ShowInTaskbar = false
+                    };
+                    _emojiPicker.EmojiSelected += (emoji) =>
+                    {
+                        InsertEmoji(emoji);
+                    };
+                    _emojiPicker.FormClosed += EmojiPicker_FormClosed;
+                    pnlEmoji.Controls.Clear();
+                    pnlEmoji.Controls.Add(_emojiPicker);
+                }
                 pnlEmoji.Visible = true;
                 _emojiPicker.Show();
-                _emojiPicker.BringToFront();
-                pnlInput.BringToFront();
+                ScrollMessagesToBottom();
             }
             catch
             {
@@ -1220,6 +1224,7 @@ namespace ChatTCP.Client.Forms
             pnlEmoji.Controls.Clear();
             _emojiPicker =
                 null;
+            ScrollMessagesToBottom();
         }
         // LOGOUT
         private void BtnLogout_Click(
@@ -1825,6 +1830,14 @@ namespace ChatTCP.Client.Forms
                         5,
                         4);
             }
+            bubble.SizeChanged += (s, e) =>
+            {
+                row.Height = Math.Max(bubble.Height + 8, 45);
+                if (isMine)
+                {
+                    bubble.Location = new Point(Math.Max(0, row.Width - bubble.Width - 5), 4);
+                }
+            };
             flpMessages.Controls.Add(
                 row);
             ScrollMessagesToBottom();
@@ -1872,6 +1885,7 @@ namespace ChatTCP.Client.Forms
                     bubble.Left = Math.Max(0, (row.Width - bubble.Width) / 2);
                     continue;
                 }
+                row.Height = Math.Max(bubble.Height + 8, 45);
                 bool isMine =
                     bubble.Tag as string ==
                     "MINE";
@@ -2013,7 +2027,8 @@ namespace ChatTCP.Client.Forms
                         _groupService.SendGroupMessage(
                             groupId.Value,
                             messageToForward.Content,
-                            isForward: true);
+                            isForward: true,
+                            senderName: _currentUsername);
                     }
                     else
                     {
@@ -2095,24 +2110,25 @@ namespace ChatTCP.Client.Forms
         // SCROLL
         private void ScrollMessagesToBottom()
         {
-            if (pnlMessages == null)
+            if (pnlMessages == null || flpMessages == null)
             {
                 return;
             }
             pnlMessages.PerformLayout();
+            flpMessages.PerformLayout();
             try
             {
-                pnlMessages.VerticalScroll.Value =
-                    pnlMessages.VerticalScroll.Maximum;
+                pnlMessages.AutoScrollPosition =
+                    new Point(0, flpMessages.Height);
+                if (flpMessages.Controls.Count > 0)
+                {
+                    pnlMessages.ScrollControlIntoView(
+                        flpMessages.Controls[flpMessages.Controls.Count - 1]);
+                }
             }
             catch
             {
             }
-            pnlMessages.AutoScrollPosition =
-                new Point(
-                    0,
-                    pnlMessages.VerticalScroll.Maximum);
-            pnlMessages.PerformLayout();
         }
         // INPUT LAYOUT
         private void LayoutInputBar()
