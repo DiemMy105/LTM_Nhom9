@@ -849,11 +849,11 @@ namespace ChatTCP.Client.Forms
             }
             UpdateChatHeaderStatus(isTargetOnline);
             Image? targetAvatar = null;
-            if (targetUser != null && !string.IsNullOrWhiteSpace(targetUser.Avatar))
+            if (targetUser != null && !string.IsNullOrWhiteSpace(targetUser.Avatar) && targetUser.Avatar != "default.png")
             {
                 targetAvatar = LoadAvatar(targetUser.Avatar);
             }
-            targetAvatar ??= LoadAvatar("avt1.png");
+            targetAvatar ??= LoadAvatar($"{username}.png") ?? LoadAvatar(targetUser?.Avatar) ?? LoadAvatar("avt1.png");
             if (targetAvatar != null)
             {
                 SetPictureBoxImage(
@@ -1528,9 +1528,12 @@ namespace ChatTCP.Client.Forms
                 if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
                 {
                     UpdateChatHeaderStatus(isOnline);
-                    if (userObj != null && !string.IsNullOrWhiteSpace(userObj.Avatar))
+                    if (userObj != null)
                     {
-                        var avt = LoadAvatar(userObj.Avatar) ?? LoadAvatar("avt1.png");
+                        var avt = (!string.IsNullOrWhiteSpace(userObj.Avatar) && userObj.Avatar != "default.png" ? LoadAvatar(userObj.Avatar) : null)
+                            ?? LoadAvatar($"{username}.png")
+                            ?? LoadAvatar(userObj.Avatar)
+                            ?? LoadAvatar("avt1.png");
                         if (avt != null)
                         {
                             SetPictureBoxImage(picChatAvatar, avt);
