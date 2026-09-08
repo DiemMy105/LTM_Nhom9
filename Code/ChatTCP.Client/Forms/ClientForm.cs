@@ -1781,10 +1781,6 @@ namespace ChatTCP.Client.Forms
                 {
                     Width =
                         rowWidth,
-                    Height =
-                        Math.Max(
-                            bubble.Height + 8,
-                            45),
                     Margin =
                         new Padding(
                             0,
@@ -1797,21 +1793,59 @@ namespace ChatTCP.Client.Forms
                     BackColor =
                         Color.Transparent
                 };
+
+            PictureBox? picAvatar = null;
+            if (!isMine)
+            {
+                string? avatarFile = null;
+                if (!string.IsNullOrWhiteSpace(message.SenderName) &&
+                    _onlineUsersByName.TryGetValue(message.SenderName, out var senderUser) &&
+                    !string.IsNullOrWhiteSpace(senderUser.Avatar))
+                {
+                    avatarFile = senderUser.Avatar;
+                }
+
+                Image? senderAvatarImg = LoadAvatar(avatarFile) ?? LoadAvatar("avt1.png");
+
+                picAvatar = new PictureBox
+                {
+                    Size = new Size(32, 32),
+                    Location = new Point(5, 4),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.LightGray,
+                    BorderStyle = BorderStyle.None,
+                    Tag = "AVATAR"
+                };
+
+                if (senderAvatarImg != null)
+                {
+                    picAvatar.Image = new Bitmap(senderAvatarImg);
+                }
+
+                MakeCircle(picAvatar);
+                row.Controls.Add(picAvatar);
+            }
+
+            int avatarOffset = picAvatar != null ? (picAvatar.Width + 10) : 0;
             bubble.AutoSize =
                 true;
             bubble.MaximumSize =
                 new Size(
                     Math.Max(
                         150,
-                        rowWidth * 65 / 100),
+                        (rowWidth - avatarOffset) * 65 / 100),
                     0);
             row.Controls.Add(
                 bubble);
             bubble.PerformLayout();
-            row.Height =
-                Math.Max(
-                    bubble.Height + 8,
-                    45);
+
+            int initialHeight = Math.Max(bubble.Height + 8, 45);
+            if (picAvatar != null)
+            {
+                initialHeight = Math.Max(initialHeight, picAvatar.Height + 8);
+            }
+            row.Height = initialHeight;
+
             if (isMine)
             {
                 bubble.Location =
@@ -1827,15 +1861,25 @@ namespace ChatTCP.Client.Forms
             {
                 bubble.Location =
                     new Point(
-                        5,
+                        picAvatar != null ? picAvatar.Right + 6 : 5,
                         4);
             }
+
             bubble.SizeChanged += (s, e) =>
             {
-                row.Height = Math.Max(bubble.Height + 8, 45);
+                int newHeight = Math.Max(bubble.Height + 8, 45);
+                if (picAvatar != null)
+                {
+                    newHeight = Math.Max(newHeight, picAvatar.Height + 8);
+                }
+                row.Height = newHeight;
                 if (isMine)
                 {
                     bubble.Location = new Point(Math.Max(0, row.Width - bubble.Width - 5), 4);
+                }
+                else
+                {
+                    bubble.Location = new Point(picAvatar != null ? picAvatar.Right + 6 : 5, 4);
                 }
             };
             flpMessages.Controls.Add(
@@ -1878,36 +1922,51 @@ namespace ChatTCP.Client.Forms
                 {
                     continue;
                 }
-                Control bubble =
-                    row.Controls[0];
-                if (row.Tag as string == "DATE_SEPARATOR" || bubble.Tag as string == "DATE_LABEL")
+                if (row.Tag as string == "DATE_SEPARATOR")
                 {
-                    bubble.Left = Math.Max(0, (row.Width - bubble.Width) / 2);
+                    if (row.Controls.Count > 0)
+                    {
+                        Control lbl = row.Controls[0];
+                        lbl.Left = Math.Max(0, (row.Width - lbl.Width) / 2);
+                    }
                     continue;
                 }
-                row.Height = Math.Max(bubble.Height + 8, 45);
-                bool isMine =
-                    bubble.Tag as string ==
-                    "MINE";
+
+                ChatBubble? bubble = row.Controls.OfType<ChatBubble>().FirstOrDefault();
+                if (bubble == null)
+                {
+                    continue;
+                }
+
+                bool isMine = bubble.Tag as string == "MINE";
                 if (bubble.Tag == null)
                 {
-                    isMine =
-                        bubble.Left >
-                        row.Width / 2;
+                    isMine = bubble.Left > row.Width / 2;
                 }
+
+                PictureBox? pic = row.Controls.OfType<PictureBox>().FirstOrDefault();
+                int requiredHeight = bubble.Height + 8;
+                if (pic != null)
+                {
+                    requiredHeight = Math.Max(requiredHeight, pic.Height + 8);
+                }
+                row.Height = Math.Max(requiredHeight, 45);
+
                 if (isMine)
                 {
-                    bubble.Left =
-                        Math.Max(
-                            0,
-                            row.Width -
-                            bubble.Width -
-                            5);
+                    bubble.Left = Math.Max(0, row.Width - bubble.Width - 5);
                 }
                 else
                 {
-                    bubble.Left =
-                        5;
+                    if (pic != null)
+                    {
+                        pic.Location = new Point(5, 4);
+                        bubble.Left = pic.Right + 6;
+                    }
+                    else
+                    {
+                        bubble.Left = 5;
+                    }
                 }
             }
         }
