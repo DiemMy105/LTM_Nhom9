@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using ChatTCP.Shared.Enums;
 using ChatTCP.Shared.Models;
@@ -27,6 +28,49 @@ namespace ChatTCP.Server.Services
             _clientManager = clientManager;
             _groupManager = groupManager;
             _groupMessageService = new GroupMessageService(groupManager);
+        }
+
+        private static void SaveAvatarFromBase64(string? fileName, string? base64Data)
+        {
+            if (string.IsNullOrWhiteSpace(fileName) || string.IsNullOrWhiteSpace(base64Data))
+                return;
+            try
+            {
+                string dir = Path.Combine(AppContext.BaseDirectory, "Resources", "Avatars");
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                string path = Path.Combine(dir, fileName.Trim());
+                byte[] bytes = Convert.FromBase64String(base64Data);
+                File.WriteAllBytes(path, bytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MessageHandler] Lỗi lưu avatar {fileName}: {ex.Message}");
+            }
+        }
+
+        private static string? GetAvatarBase64(string? fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName)) return null;
+            try
+            {
+                string path = Path.Combine(AppContext.BaseDirectory, "Resources", "Avatars", fileName.Trim());
+                if (!File.Exists(path)) return null;
+                byte[] bytes = File.ReadAllBytes(path);
+                return Convert.ToBase64String(bytes);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static void PopulateAvatarData(User? user)
+        {
+            if (user == null || string.IsNullOrWhiteSpace(user.Avatar)) return;
+            user.AvatarData = GetAvatarBase64(user.Avatar);
         }
 
         // Nhận chuỗi JSON từ Client, giải mã rồi chuyển tiếp xử lý
@@ -127,6 +171,10 @@ namespace ChatTCP.Server.Services
                             username = loginData.Username;
                         }
                         password = loginData.Password;
+                        if (!string.IsNullOrWhiteSpace(loginData.AvatarData))
+                        {
+                            SaveAvatarFromBase64($"{username}.png", loginData.AvatarData);
+                        }
                     }
                 }
                 catch
@@ -138,6 +186,12 @@ namespace ChatTCP.Server.Services
             // Kiểm tra thông tin với CSDL
             User? user = _dbService.LoginUser(username, password, out string errorMessage);
             bool isSuccess = (user != null);
+
+            if (isSuccess && user != null)
+            {
+                PopulateAvatarData(user);
+            }
+
             var responseData = new LoginResponseData
             {
                 Success = isSuccess,
@@ -178,6 +232,7 @@ namespace ChatTCP.Server.Services
                         Username = user.Username,
                         DisplayName = user.DisplayName,
                         Avatar = user.Avatar,
+                        AvatarData = user.AvatarData,
                         Status = "Online"
                     }),
                     Timestamp = DateTime.Now
@@ -224,9 +279,23 @@ namespace ChatTCP.Server.Services
                 newUser.Username = msg.SenderName;
             }
 
+            if (!string.IsNullOrWhiteSpace(newUser.AvatarData))
+            {
+                string avtFile = string.IsNullOrWhiteSpace(newUser.Avatar) || newUser.Avatar == "default.png"
+                    ? $"{newUser.Username}.png"
+                    : newUser.Avatar;
+                newUser.Avatar = avtFile;
+                SaveAvatarFromBase64(avtFile, newUser.AvatarData);
+            }
+
             // Lưu người dùng mới vào CSDL
             User? registeredUser = _dbService.RegisterUser(newUser, out string errorMessage);
             bool isSuccess = (registeredUser != null);
+
+            if (isSuccess && registeredUser != null)
+            {
+                PopulateAvatarData(registeredUser);
+            }
 
             var responseData = new RegisterResponseData
             {
@@ -633,6 +702,7 @@ namespace ChatTCP.Server.Services
                     bool isOnline = _clientManager.GetClient(u.UserId) != null;
                     u.Status = isOnline ? "Online" : "Offline";
                     u.Password = string.Empty; // Không gửi mật khẩu
+                    PopulateAvatarData(u);
                 }
 
                 Message response = new Message
@@ -658,6 +728,7 @@ namespace ChatTCP.Server.Services
         {
             public string Username { get; set; } = string.Empty;
             public string Password { get; set; } = string.Empty;
+            public string? AvatarData { get; set; }
         }
 
         private class LoginResponseData

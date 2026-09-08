@@ -1419,6 +1419,10 @@ namespace ChatTCP.Client.Forms
                             {
                                 foreach (var u in users)
                                 {
+                                    if (!string.IsNullOrWhiteSpace(u.AvatarData))
+                                    {
+                                        ImageUtils.SaveAvatarFromBase64(u.Avatar, u.AvatarData);
+                                    }
                                     if (string.Equals(u.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
                                         continue;
                                     bool isOnline = string.Equals(u.Status, "Online", StringComparison.OrdinalIgnoreCase);
@@ -1437,6 +1441,10 @@ namespace ChatTCP.Client.Forms
                         {
                             InvokeIfRequired(() =>
                             {
+                                if (!string.IsNullOrWhiteSpace(user.AvatarData))
+                                {
+                                    ImageUtils.SaveAvatarFromBase64(user.Avatar, user.AvatarData);
+                                }
                                 if (string.Equals(user.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
                                     return;
                                 bool isOnline = string.Equals(user.Status, "Online", StringComparison.OrdinalIgnoreCase);
