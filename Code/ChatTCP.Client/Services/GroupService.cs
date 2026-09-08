@@ -14,6 +14,7 @@ namespace ChatTCP.Client.Services
         private readonly TcpClientManager tcpClientManager;
 
         public int CurrentUserId { get; }
+        public string? CurrentUsername { get; }
 
         public event Action<Group>? GroupCreated;
         public event Action<string>? CreateGroupFailed;
@@ -36,12 +37,14 @@ namespace ChatTCP.Client.Services
 
         public GroupService(
             TcpClientManager tcpClientManager,
-            int currentUserId)
+            int currentUserId,
+            string? currentUsername = null)
         {
             this.tcpClientManager =
                 tcpClientManager;
 
             CurrentUserId = currentUserId;
+            CurrentUsername = currentUsername;
 
             this.tcpClientManager.MessageReceived
                 += OnMessageReceived;
@@ -176,7 +179,8 @@ namespace ChatTCP.Client.Services
             int? replyToId = null,
             string? replyToSenderName = null,
             string? replyToContent = null,
-            bool isForward = false)
+            bool isForward = false,
+            string? senderName = null)
         {
             EnsureConnected();
 
@@ -204,6 +208,7 @@ namespace ChatTCP.Client.Services
             Message message = new Message
             {
                 SenderId = CurrentUserId,
+                SenderName = senderName ?? CurrentUsername,
                 ReceiverId = null,
                 GroupId = groupId,
                 Content = normalizedContent,
