@@ -1806,14 +1806,20 @@ namespace ChatTCP.Client.Forms
             if (!isMine)
             {
                 string? avatarFile = null;
-                if (!string.IsNullOrWhiteSpace(message.SenderName) &&
-                    _onlineUsersByName.TryGetValue(message.SenderName, out var senderUser) &&
-                    !string.IsNullOrWhiteSpace(senderUser.Avatar))
+                if (!string.IsNullOrWhiteSpace(message.SenderName))
                 {
-                    avatarFile = senderUser.Avatar;
+                    if (_onlineUsersByName.TryGetValue(message.SenderName, out var senderUser) &&
+                        !string.IsNullOrWhiteSpace(senderUser.Avatar))
+                    {
+                        avatarFile = senderUser.Avatar;
+                    }
+                    else
+                    {
+                        avatarFile = $"{message.SenderName}.png";
+                    }
                 }
 
-                Image? senderAvatarImg = LoadAvatar(avatarFile) ?? LoadAvatar("avt1.png");
+                Image? senderAvatarImg = LoadAvatar(avatarFile) ?? LoadAvatar($"{message.SenderName}.png") ?? LoadAvatar("avt1.png");
 
                 picAvatar = new PictureBox
                 {
