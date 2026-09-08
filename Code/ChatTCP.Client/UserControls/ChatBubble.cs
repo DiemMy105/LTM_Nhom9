@@ -63,7 +63,7 @@ namespace ChatTCP.Client.UserControls
 
             lblContent.AutoSize = true;
             lblContent.MaximumSize = new Size(MaxContentWidth, 0);
-            lblContent.Font = new Font("Segoe UI Emoji", 9.5F);
+            lblContent.Font = new Font("Segoe UI", 9.5F);
 
 
             lblTime.AutoSize = true;
