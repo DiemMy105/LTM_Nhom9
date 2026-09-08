@@ -319,6 +319,11 @@ namespace ChatTCP.Server.Services
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(msg.SenderName) && !string.IsNullOrWhiteSpace(client.Username))
+                {
+                    msg.SenderName = client.Username;
+                }
+
                 // Lưu tin nhắn nhóm vào CSDL
                 _dbService.SaveMessage(msg);
 
