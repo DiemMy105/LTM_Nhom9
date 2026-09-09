@@ -453,6 +453,7 @@ namespace ChatTCP.Client.Forms
                             8F)
                 };
 
+
             btnGroupMembers =
                 new Button
                 {
@@ -469,6 +470,7 @@ namespace ChatTCP.Client.Forms
             btnGroupMembers.FlatAppearance.BorderSize = 0;
             btnGroupMembers.Click +=
                 BtnGroupMembers_Click;
+
 
             pnlChatHeader.Controls.AddRange(
                 new Control[]
@@ -849,11 +851,11 @@ namespace ChatTCP.Client.Forms
             }
             UpdateChatHeaderStatus(isTargetOnline);
             Image? targetAvatar = null;
-            if (targetUser != null && !string.IsNullOrWhiteSpace(targetUser.Avatar))
+            if (targetUser != null && !string.IsNullOrWhiteSpace(targetUser.Avatar) && targetUser.Avatar != "default.png")
             {
                 targetAvatar = LoadAvatar(targetUser.Avatar);
             }
-            targetAvatar ??= LoadAvatar("avt1.png");
+            targetAvatar ??= LoadAvatar($"{username}.png") ?? LoadAvatar(targetUser?.Avatar) ?? LoadAvatar("avt1.png");
             if (targetAvatar != null)
             {
                 SetPictureBoxImage(
@@ -933,6 +935,7 @@ namespace ChatTCP.Client.Forms
             ScrollMessagesToBottom();
         }
 
+
         private void BtnGroupMembers_Click(
             object? sender,
             EventArgs e)
@@ -946,10 +949,12 @@ namespace ChatTCP.Client.Forms
                 return;
             }
 
+
             List<User> users =
                 _onlineUsersByName.Values
                     .Append(_currentUser)
                     .ToList();
+
 
             using var form =
                 new GroupMembersForm(
@@ -957,8 +962,10 @@ namespace ChatTCP.Client.Forms
                     users,
                     _groupService);
 
+
             form.ShowDialog(this);
         }
+
 
         // CREATE GROUP
         private void BtnCreateGroup_Click(
@@ -1419,6 +1426,10 @@ namespace ChatTCP.Client.Forms
                             {
                                 foreach (var u in users)
                                 {
+                                    if (!string.IsNullOrWhiteSpace(u.AvatarData))
+                                    {
+                                        ImageUtils.SaveAvatarFromBase64(u.Avatar, u.AvatarData);
+                                    }
                                     if (string.Equals(u.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
                                         continue;
                                     bool isOnline = string.Equals(u.Status, "Online", StringComparison.OrdinalIgnoreCase);
@@ -1437,6 +1448,10 @@ namespace ChatTCP.Client.Forms
                         {
                             InvokeIfRequired(() =>
                             {
+                                if (!string.IsNullOrWhiteSpace(user.AvatarData))
+                                {
+                                    ImageUtils.SaveAvatarFromBase64(user.Avatar, user.AvatarData);
+                                }
                                 if (string.Equals(user.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
                                     return;
                                 bool isOnline = string.Equals(user.Status, "Online", StringComparison.OrdinalIgnoreCase);
@@ -1520,9 +1535,12 @@ namespace ChatTCP.Client.Forms
                 if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
                 {
                     UpdateChatHeaderStatus(isOnline);
-                    if (userObj != null && !string.IsNullOrWhiteSpace(userObj.Avatar))
+                    if (userObj != null)
                     {
-                        var avt = LoadAvatar(userObj.Avatar) ?? LoadAvatar("avt1.png");
+                        var avt = (!string.IsNullOrWhiteSpace(userObj.Avatar) && userObj.Avatar != "default.png" ? LoadAvatar(userObj.Avatar) : null)
+                            ?? LoadAvatar($"{username}.png")
+                            ?? LoadAvatar(userObj.Avatar)
+                            ?? LoadAvatar("avt1.png");
                         if (avt != null)
                         {
                             SetPictureBoxImage(picChatAvatar, avt);
@@ -1620,6 +1638,7 @@ namespace ChatTCP.Client.Forms
             });
         }
 
+
         private void OnGroupChanged(Group group)
         {
             InvokeIfRequired(() =>
@@ -1631,6 +1650,7 @@ namespace ChatTCP.Client.Forms
                     return;
                 }
 
+
                 _groupsByName[group.GroupName] = group;
                 AddGroupToList(
                     group.GroupName,
@@ -1638,23 +1658,28 @@ namespace ChatTCP.Client.Forms
             });
         }
 
+
         private void OnGroupDissolved(int groupId)
         {
             InvokeIfRequired(() =>
                 RemoveGroupFromClient(groupId));
         }
 
+
         private void RemoveGroupFromClient(int groupId)
         {
             var pair = _groupsByName.FirstOrDefault(
                 item => item.Value.GroupId == groupId);
+
 
             if (string.IsNullOrWhiteSpace(pair.Key))
             {
                 return;
             }
 
+
             string groupName = pair.Key;
+
 
             if (_groupItems.TryGetValue(
                 groupName,
@@ -1664,7 +1689,9 @@ namespace ChatTCP.Client.Forms
                 _groupItems.Remove(groupName);
             }
 
+
             _groupsByName.Remove(groupName);
+
 
             if (_activeChatIsGroup &&
                 string.Equals(
@@ -1681,6 +1708,7 @@ namespace ChatTCP.Client.Forms
                 flpMessages.Controls.Clear();
             }
         }
+
 
         private void OnGroupMessageReceived(
             ChatMessage message)
@@ -1781,10 +1809,6 @@ namespace ChatTCP.Client.Forms
                 {
                     Width =
                         rowWidth,
-                    Height =
-                        Math.Max(
-                            bubble.Height + 8,
-                            45),
                     Margin =
                         new Padding(
                             0,
@@ -1797,21 +1821,73 @@ namespace ChatTCP.Client.Forms
                     BackColor =
                         Color.Transparent
                 };
+
+
+            PictureBox? picAvatar = null;
+            if (!isMine)
+            {
+                string? avatarFile = null;
+                if (!string.IsNullOrWhiteSpace(message.SenderName))
+                {
+                    if (_onlineUsersByName.TryGetValue(message.SenderName, out var senderUser) &&
+                        !string.IsNullOrWhiteSpace(senderUser.Avatar))
+                    {
+                        avatarFile = senderUser.Avatar;
+                    }
+                    else
+                    {
+                        avatarFile = $"{message.SenderName}.png";
+                    }
+                }
+
+
+                Image? senderAvatarImg = LoadAvatar(avatarFile) ?? LoadAvatar($"{message.SenderName}.png") ?? LoadAvatar("avt1.png");
+
+
+                picAvatar = new PictureBox
+                {
+                    Size = new Size(32, 32),
+                    Location = new Point(5, 4),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.LightGray,
+                    BorderStyle = BorderStyle.None,
+                    Tag = "AVATAR"
+                };
+
+
+                if (senderAvatarImg != null)
+                {
+                    picAvatar.Image = new Bitmap(senderAvatarImg);
+                }
+
+
+                MakeCircle(picAvatar);
+                row.Controls.Add(picAvatar);
+            }
+
+
+            int avatarOffset = picAvatar != null ? (picAvatar.Width + 10) : 0;
             bubble.AutoSize =
                 true;
             bubble.MaximumSize =
                 new Size(
                     Math.Max(
                         150,
-                        rowWidth * 65 / 100),
+                        (rowWidth - avatarOffset) * 65 / 100),
                     0);
             row.Controls.Add(
                 bubble);
             bubble.PerformLayout();
-            row.Height =
-                Math.Max(
-                    bubble.Height + 8,
-                    45);
+
+
+            int initialHeight = Math.Max(bubble.Height + 8, 45);
+            if (picAvatar != null)
+            {
+                initialHeight = Math.Max(initialHeight, picAvatar.Height + 8);
+            }
+            row.Height = initialHeight;
+
+
             if (isMine)
             {
                 bubble.Location =
@@ -1827,15 +1903,26 @@ namespace ChatTCP.Client.Forms
             {
                 bubble.Location =
                     new Point(
-                        5,
+                        picAvatar != null ? picAvatar.Right + 6 : 5,
                         4);
             }
+
+
             bubble.SizeChanged += (s, e) =>
             {
-                row.Height = Math.Max(bubble.Height + 8, 45);
+                int newHeight = Math.Max(bubble.Height + 8, 45);
+                if (picAvatar != null)
+                {
+                    newHeight = Math.Max(newHeight, picAvatar.Height + 8);
+                }
+                row.Height = newHeight;
                 if (isMine)
                 {
                     bubble.Location = new Point(Math.Max(0, row.Width - bubble.Width - 5), 4);
+                }
+                else
+                {
+                    bubble.Location = new Point(picAvatar != null ? picAvatar.Right + 6 : 5, 4);
                 }
             };
             flpMessages.Controls.Add(
@@ -1878,36 +1965,55 @@ namespace ChatTCP.Client.Forms
                 {
                     continue;
                 }
-                Control bubble =
-                    row.Controls[0];
-                if (row.Tag as string == "DATE_SEPARATOR" || bubble.Tag as string == "DATE_LABEL")
+                if (row.Tag as string == "DATE_SEPARATOR")
                 {
-                    bubble.Left = Math.Max(0, (row.Width - bubble.Width) / 2);
+                    if (row.Controls.Count > 0)
+                    {
+                        Control lbl = row.Controls[0];
+                        lbl.Left = Math.Max(0, (row.Width - lbl.Width) / 2);
+                    }
                     continue;
                 }
-                row.Height = Math.Max(bubble.Height + 8, 45);
-                bool isMine =
-                    bubble.Tag as string ==
-                    "MINE";
+
+
+                ChatBubble? bubble = row.Controls.OfType<ChatBubble>().FirstOrDefault();
+                if (bubble == null)
+                {
+                    continue;
+                }
+
+
+                bool isMine = bubble.Tag as string == "MINE";
                 if (bubble.Tag == null)
                 {
-                    isMine =
-                        bubble.Left >
-                        row.Width / 2;
+                    isMine = bubble.Left > row.Width / 2;
                 }
+
+
+                PictureBox? pic = row.Controls.OfType<PictureBox>().FirstOrDefault();
+                int requiredHeight = bubble.Height + 8;
+                if (pic != null)
+                {
+                    requiredHeight = Math.Max(requiredHeight, pic.Height + 8);
+                }
+                row.Height = Math.Max(requiredHeight, 45);
+
+
                 if (isMine)
                 {
-                    bubble.Left =
-                        Math.Max(
-                            0,
-                            row.Width -
-                            bubble.Width -
-                            5);
+                    bubble.Left = Math.Max(0, row.Width - bubble.Width - 5);
                 }
                 else
                 {
-                    bubble.Left =
-                        5;
+                    if (pic != null)
+                    {
+                        pic.Location = new Point(5, 4);
+                        bubble.Left = pic.Right + 6;
+                    }
+                    else
+                    {
+                        bubble.Left = 5;
+                    }
                 }
             }
         }

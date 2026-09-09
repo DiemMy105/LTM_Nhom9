@@ -4,7 +4,9 @@ using ChatTCP.Client.Network;
 using ChatTCP.Shared.Enums;
 using ChatTCP.Shared.Models;
 
+
 using Message = ChatTCP.Shared.Models.Message;
+
 
 namespace ChatTCP.Client.Services
 {
@@ -28,7 +30,7 @@ namespace ChatTCP.Client.Services
             return tcpClientManager.Connect(ip, port);
         }
         /// Đăng nhập.
-       
+
         public void RequestLogin(string username, string password)
         {
             if (!tcpClientManager.IsConnected)
@@ -38,10 +40,12 @@ namespace ChatTCP.Client.Services
             }
             try
             {
+                string? avatarData = Utils.ImageUtils.GetAvatarBase64($"{username}.png");
                 var request = new LoginRequestData
                 {
                     Username = username,
-                    Password = password
+                    Password = password,
+                    AvatarData = avatarData
                 };
                 string json = JsonSerializer.Serialize(request);
                 Message message = new Message
@@ -66,7 +70,8 @@ namespace ChatTCP.Client.Services
             string username,
             string password,
             string displayName,
-            string? avatarFileName = null)
+            string? avatarFileName = null,
+            string? avatarData = null)
         {
             if (!tcpClientManager.IsConnected)
             {
@@ -80,7 +85,8 @@ namespace ChatTCP.Client.Services
                     Username = username,
                     Password = password,
                     DisplayName = displayName,
-                    Avatar = avatarFileName
+                    Avatar = avatarFileName,
+                    AvatarData = avatarData
                 };
                 string json = JsonSerializer.Serialize(request);
                 Message message = new Message
@@ -100,7 +106,7 @@ namespace ChatTCP.Client.Services
                 );
             }
         }
-        /// Xử lý Message nhận 
+        /// Xử lý Message nhận
         private void OnMessageReceived(Message message)
         {
             try
@@ -110,6 +116,8 @@ namespace ChatTCP.Client.Services
                     case MessageType.LoginResponse:
                         HandleLoginResponse(message);
                         break;
+
+
 
 
                     case MessageType.RegisterResponse:
@@ -128,6 +136,8 @@ namespace ChatTCP.Client.Services
                         break;
 
 
+
+
                     case MessageType.RegisterResponse:
                         RegisterFailed?.Invoke(
                             "Lỗi xử lý phản hồi đăng ký: " + ex.Message
@@ -137,7 +147,7 @@ namespace ChatTCP.Client.Services
             }
         }
         /// Xử lý kết quả đăng nhập từ Server.
-       
+
         private void HandleLoginResponse(Message message)
         {
             try
@@ -146,6 +156,8 @@ namespace ChatTCP.Client.Services
                     JsonSerializer.Deserialize<LoginResponseData>(
                         message.Content
                     );
+
+
 
 
                 if (response == null)
@@ -157,6 +169,8 @@ namespace ChatTCP.Client.Services
                 }
 
 
+
+
                 if (!response.Success)
                 {
                     LoginFailed?.Invoke(
@@ -166,8 +180,12 @@ namespace ChatTCP.Client.Services
                     );
 
 
+
+
                     return;
                 }
+
+
 
 
                 if (response.User == null)
@@ -177,7 +195,15 @@ namespace ChatTCP.Client.Services
                     );
 
 
+
+
                     return;
+                }
+
+
+                if (!string.IsNullOrWhiteSpace(response.User.AvatarData))
+                {
+                    Utils.ImageUtils.SaveAvatarFromBase64(response.User.Avatar, response.User.AvatarData);
                 }
 
 
@@ -190,9 +216,9 @@ namespace ChatTCP.Client.Services
                 );
             }
         }
-       
+
         /// Xử lý kết quả đăng ký từ Server.
-       
+
         private void HandleRegisterResponse(Message message)
         {
             try
@@ -201,6 +227,8 @@ namespace ChatTCP.Client.Services
                     JsonSerializer.Deserialize<RegisterResponseData>(
                         message.Content
                     );
+
+
 
 
                 if (response == null)
@@ -226,6 +254,14 @@ namespace ChatTCP.Client.Services
                     );
                     return;
                 }
+
+
+                if (!string.IsNullOrWhiteSpace(response.User.AvatarData))
+                {
+                    Utils.ImageUtils.SaveAvatarFromBase64(response.User.Avatar, response.User.AvatarData);
+                }
+
+
                 RegisterSucceeded?.Invoke(response.User);
             }
             catch
@@ -246,6 +282,7 @@ namespace ChatTCP.Client.Services
         {
             public string Username { get; set; } = string.Empty;
             public string Password { get; set; } = string.Empty;
+            public string? AvatarData { get; set; }
         }
         private class RegisterRequestData
         {
@@ -253,7 +290,9 @@ namespace ChatTCP.Client.Services
             public string Password { get; set; } = string.Empty;
             public string DisplayName { get; set; } = string.Empty;
             public string? Avatar { get; set; }
+            public string? AvatarData { get; set; }
         }
+
 
         private class LoginResponseData
         {
@@ -269,6 +308,3 @@ namespace ChatTCP.Client.Services
         }
     }
 }
-
-
-
