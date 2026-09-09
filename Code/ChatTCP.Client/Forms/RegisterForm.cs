@@ -492,11 +492,17 @@ namespace ChatTCP.Client.Forms
                     isError: false);
                 string? avatarFileName =
                     SaveAvatarLocallyOrNull(username);
+                string? avatarData = null;
+                if (!string.IsNullOrWhiteSpace(_selectedAvatarPath))
+                {
+                    avatarData = ImageUtils.ConvertImageFileToBase64(_selectedAvatarPath, 128, 128);
+                }
                 authService.RequestRegister(
                     username,
                     password,
                     displayName,
-                    avatarFileName);
+                    avatarFileName,
+                    avatarData);
             }
             catch (Exception ex)
             {
