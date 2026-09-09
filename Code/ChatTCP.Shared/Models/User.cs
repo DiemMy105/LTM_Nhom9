@@ -9,6 +9,7 @@ namespace ChatTCP.Shared.Models
         public string Password { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string Avatar { get; set; } = "default.png";
+        public string? AvatarData { get; set; };
         public string Status { get; set; } = "Offline";
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }

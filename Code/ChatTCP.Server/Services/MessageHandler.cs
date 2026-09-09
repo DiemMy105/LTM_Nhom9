@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using ChatTCP.Shared.Enums;
 using ChatTCP.Shared.Models;
 using ChatTCP.Shared.Network;
 using ChatTCP.Server.Network;
 using Message = ChatTCP.Shared.Models.Message;
+
 
 namespace ChatTCP.Server.Services
 {
@@ -17,9 +19,11 @@ namespace ChatTCP.Server.Services
         private readonly GroupManager _groupManager;
         private readonly GroupMessageService _groupMessageService;
 
+
         public event Action<User, ClientConnection>? UserLoggedIn;
         public event Action<User>? UserRegistered;
         public event Action<int, string>? UserLoggedOut;
+
 
         public MessageHandler(DatabaseService dbService, ClientManager clientManager, GroupManager groupManager)
         {
@@ -28,6 +32,53 @@ namespace ChatTCP.Server.Services
             _groupManager = groupManager;
             _groupMessageService = new GroupMessageService(groupManager);
         }
+
+
+        private static void SaveAvatarFromBase64(string? fileName, string? base64Data)
+        {
+            if (string.IsNullOrWhiteSpace(fileName) || string.IsNullOrWhiteSpace(base64Data))
+                return;
+            try
+            {
+                string dir = Path.Combine(AppContext.BaseDirectory, "Resources", "Avatars");
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                string path = Path.Combine(dir, fileName.Trim());
+                byte[] bytes = Convert.FromBase64String(base64Data);
+                File.WriteAllBytes(path, bytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MessageHandler] Lỗi lưu avatar {fileName}: {ex.Message}");
+            }
+        }
+
+
+        private static string? GetAvatarBase64(string? fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName)) return null;
+            try
+            {
+                string path = Path.Combine(AppContext.BaseDirectory, "Resources", "Avatars", fileName.Trim());
+                if (!File.Exists(path)) return null;
+                byte[] bytes = File.ReadAllBytes(path);
+                return Convert.ToBase64String(bytes);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+
+        private static void PopulateAvatarData(User? user)
+        {
+            if (user == null || string.IsNullOrWhiteSpace(user.Avatar)) return;
+            user.AvatarData = GetAvatarBase64(user.Avatar);
+        }
+
 
         // Nhận chuỗi JSON từ Client, giải mã rồi chuyển tiếp xử lý
         public void HandleIncomingMessage(string jsonMessage, ClientConnection client)
@@ -50,6 +101,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         // Phân loại MessageType để gọi hàm xử lý tương ứng
         public void HandleIncomingMessage(Message msg, ClientConnection client)
         {
@@ -61,29 +113,36 @@ namespace ChatTCP.Server.Services
                         HandleLogin(msg, client);
                         break;
 
+
                     case MessageType.RegisterRequest:
                         HandleRegister(msg, client);
                         break;
+
 
                     case MessageType.LogoutRequest:
                         HandleLogout(msg, client);
                         break;
 
+
                     case MessageType.DirectChat:
                         HandleDirectChat(msg, client);
                         break;
+
 
                     case MessageType.GroupChat:
                         HandleGroupChat(msg, client);
                         break;
 
+
                     case MessageType.CreateGroupRequest:
                         HandleCreateGroup(msg, client);
                         break;
 
+
                     case MessageType.GetGroupListRequest:
                         HandleGetGroupList(msg, client);
                         break;
+
 
                     case MessageType.AddGroupMemberRequest:
                     case MessageType.RemoveGroupMemberRequest:
@@ -91,13 +150,16 @@ namespace ChatTCP.Server.Services
                         HandleGroupManagement(msg, client);
                         break;
 
+
                     case MessageType.GetUserListRequest:
                         HandleGetUserList(msg, client);
                         break;
 
+
                     case MessageType.GetChatHistoryRequest:
                         HandleGetChatHistory(msg, client);
                         break;
+
 
                     default:
                         Console.WriteLine($"[MessageHandler] Chưa hỗ trợ loại tin nhắn: {msg.Type}");
@@ -110,10 +172,12 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         private void HandleLogin(Message msg, ClientConnection client)
         {
             string username = msg.SenderName;
             string password = msg.Content;
+
 
             if (!string.IsNullOrWhiteSpace(msg.Content) && msg.Content.TrimStart().StartsWith("{"))
             {
@@ -127,23 +191,38 @@ namespace ChatTCP.Server.Services
                             username = loginData.Username;
                         }
                         password = loginData.Password;
+                        if (!string.IsNullOrWhiteSpace(loginData.AvatarData))
+                        {
+                            SaveAvatarFromBase64($"{username}.png", loginData.AvatarData);
+                        }
                     }
                 }
                 catch
                 {
 
+
                 }
             }
+
 
             // Kiểm tra thông tin với CSDL
             User? user = _dbService.LoginUser(username, password, out string errorMessage);
             bool isSuccess = (user != null);
+
+
+            if (isSuccess && user != null)
+            {
+                PopulateAvatarData(user);
+            }
+
+
             var responseData = new LoginResponseData
             {
                 Success = isSuccess,
                 Message = isSuccess ? "Đăng nhập thành công" : (string.IsNullOrEmpty(errorMessage) ? "Đăng nhập thất bại" : errorMessage),
                 User = isSuccess ? user : null
             };
+
 
             Message response = new Message
             {
@@ -155,6 +234,7 @@ namespace ChatTCP.Server.Services
                 Timestamp = DateTime.Now
             };
 
+
             // Nếu đúng tài khoản: lưu UserId, Username vào ClientConnection và thêm vào danh sách Online
             if (isSuccess && user != null)
             {
@@ -162,9 +242,12 @@ namespace ChatTCP.Server.Services
                 client.Username = user.Username;
                 _clientManager.AddClient(client);
 
+
                 UserLoggedIn?.Invoke(user, client);
 
+
                 Console.WriteLine($"[MessageHandler] Người dùng \"{user.Username}\" (ID: {user.UserId}) đã đăng nhập.");
+
 
                 // Thông báo tới các Client khác là user này vừa Online
                 var statusMsg = new Message
@@ -178,6 +261,7 @@ namespace ChatTCP.Server.Services
                         Username = user.Username,
                         DisplayName = user.DisplayName,
                         Avatar = user.Avatar,
+                        AvatarData = user.AvatarData,
                         Status = "Online"
                     }),
                     Timestamp = DateTime.Now
@@ -189,13 +273,16 @@ namespace ChatTCP.Server.Services
                 Console.WriteLine($"[MessageHandler] Đăng nhập thất bại cho \"{username}\": {errorMessage}");
             }
 
+
             client.SendMessage(response);
         }
+
 
         // Xử lý đăng ký tài khoản mới
         private void HandleRegister(Message msg, ClientConnection client)
         {
             User newUser;
+
 
             // Đọc thông tin User nếu gửi dạng JSON
             if (!string.IsNullOrWhiteSpace(msg.Content) && msg.Content.TrimStart().StartsWith("{"))
@@ -219,14 +306,33 @@ namespace ChatTCP.Server.Services
                 };
             }
 
+
             if (string.IsNullOrWhiteSpace(newUser.Username))
             {
                 newUser.Username = msg.SenderName;
             }
 
+
+            if (!string.IsNullOrWhiteSpace(newUser.AvatarData))
+            {
+                string avtFile = string.IsNullOrWhiteSpace(newUser.Avatar) || newUser.Avatar == "default.png"
+                    ? $"{newUser.Username}.png"
+                    : newUser.Avatar;
+                newUser.Avatar = avtFile;
+                SaveAvatarFromBase64(avtFile, newUser.AvatarData);
+            }
+
+
             // Lưu người dùng mới vào CSDL
             User? registeredUser = _dbService.RegisterUser(newUser, out string errorMessage);
             bool isSuccess = (registeredUser != null);
+
+
+            if (isSuccess && registeredUser != null)
+            {
+                PopulateAvatarData(registeredUser);
+            }
+
 
             var responseData = new RegisterResponseData
             {
@@ -234,6 +340,7 @@ namespace ChatTCP.Server.Services
                 Message = isSuccess ? "Đăng ký tài khoản thành công" : (string.IsNullOrEmpty(errorMessage) ? "Đăng ký thất bại" : errorMessage),
                 User = isSuccess ? registeredUser : null
             };
+
 
             Message response = new Message
             {
@@ -245,6 +352,7 @@ namespace ChatTCP.Server.Services
                 Timestamp = DateTime.Now
             };
 
+
             if (isSuccess && registeredUser != null)
             {
                 UserRegistered?.Invoke(registeredUser);
@@ -255,8 +363,10 @@ namespace ChatTCP.Server.Services
                 Console.WriteLine($"[MessageHandler] Đăng ký thất bại cho \"{newUser.Username}\": {errorMessage}");
             }
 
+
             client.SendMessage(response);
         }
+
 
         // Xử lý đăng xuất tài khoản
         private void HandleLogout(Message msg, ClientConnection client)
@@ -266,12 +376,16 @@ namespace ChatTCP.Server.Services
                 int loggedOutUserId = client.UserId;
                 string loggedOutUsername = client.Username ?? string.Empty;
 
+
                 _dbService.UpdateUserStatus(client.UserId, "Offline");
                 _clientManager.RemoveClient(client);
 
+
                 UserLoggedOut?.Invoke(loggedOutUserId, loggedOutUsername);
 
+
                 Console.WriteLine($"[MessageHandler] Người dùng ID {client.UserId} (\"{client.Username}\") đã đăng xuất.");
+
 
                 // Thông báo tới các Client khác là user này vừa Offline
                 var statusMsg = new Message
@@ -291,18 +405,22 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         // Chuyển tiếp tin nhắn chat 1-1 tới người nhận
         private void HandleDirectChat(Message msg, ClientConnection client)
         {
             // Lưu tin nhắn vào CSDL
             _dbService.SaveMessage(msg);
 
+
             bool isDelivered = false;
+
 
             if (msg.ReceiverId.HasValue && msg.ReceiverId.Value > 0)
             {
                 isDelivered = _clientManager.ForwardMessageToClient(msg.ReceiverId.Value, msg);
             }
+
 
             if (isDelivered)
             {
@@ -314,6 +432,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         // Gửi tin nhắn nhóm tới các thành viên đang online
         private void HandleGroupChat(Message msg, ClientConnection client)
         {
@@ -324,11 +443,14 @@ namespace ChatTCP.Server.Services
                     msg.SenderName = client.Username;
                 }
 
+
                 // Lưu tin nhắn nhóm vào CSDL
                 _dbService.SaveMessage(msg);
 
+
                 var result = _groupMessageService.PrepareGroupMessage(msg);
                 int sentCount = 0;
+
 
                 foreach (int recipientId in result.RecipientIds)
                 {
@@ -338,6 +460,7 @@ namespace ChatTCP.Server.Services
                     }
                 }
 
+
                 Console.WriteLine($"[MessageHandler] Gửi tin nhóm (ID: {msg.GroupId}) tới {sentCount}/{result.RecipientIds.Count} thành viên online.");
             }
             catch (Exception ex)
@@ -345,6 +468,7 @@ namespace ChatTCP.Server.Services
                 Console.WriteLine($"[MessageHandler] Lỗi tin nhắn nhóm ID {msg.GroupId}: {ex.Message}");
             }
         }
+
 
         // Xử lý tạo nhóm chat mới
         private void HandleCreateGroup(Message msg, ClientConnection client)
@@ -354,6 +478,7 @@ namespace ChatTCP.Server.Services
                 Message response = _groupManager.HandleCreateGroupRequest(msg);
                 client.SendMessage(response);
                 Console.WriteLine($"[MessageHandler] Đã xử lý tạo nhóm từ User ID {msg.SenderId}");
+
 
                 // Gửi thông báo cập nhật nhóm tới tất cả các thành viên khác đang online
                 try
@@ -390,6 +515,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         private void HandleGroupManagement(
             Message msg,
             ClientConnection client)
@@ -403,7 +529,9 @@ namespace ChatTCP.Server.Services
                         ? MessageType.RemoveGroupMemberResponse
                         : MessageType.DissolveGroupResponse;
 
+
             GroupManagementResponse response;
+
 
             try
             {
@@ -413,9 +541,11 @@ namespace ChatTCP.Server.Services
                         "Bạn chưa đăng nhập.");
                 }
 
+
                 GroupManagementRequest? request =
                     JsonSerializer.Deserialize<GroupManagementRequest>(
                         msg.Content);
+
 
                 if (request == null)
                 {
@@ -423,8 +553,10 @@ namespace ChatTCP.Server.Services
                         "Dữ liệu quản lý nhóm không hợp lệ.");
                 }
 
+
                 groupId = request.GroupId;
                 Group group;
+
 
                 if (msg.Type == MessageType.AddGroupMemberRequest)
                 {
@@ -432,6 +564,7 @@ namespace ChatTCP.Server.Services
                         request.GroupId,
                         client.UserId,
                         request.MemberId);
+
 
                     foreach (int id in group.MemberIds)
                     {
@@ -446,6 +579,7 @@ namespace ChatTCP.Server.Services
                         recipients.Add(id);
                     }
 
+
                     group = _groupManager.RemoveMember(
                         request.GroupId,
                         client.UserId,
@@ -459,10 +593,12 @@ namespace ChatTCP.Server.Services
                         recipients.Add(id);
                     }
 
+
                     group = _groupManager.DissolveGroup(
                         request.GroupId,
                         client.UserId);
                 }
+
 
                 response = new GroupManagementResponse
                 {
@@ -481,6 +617,7 @@ namespace ChatTCP.Server.Services
                 };
             }
 
+
             Message responseMessage = new Message
             {
                 SenderId = 0,
@@ -492,15 +629,18 @@ namespace ChatTCP.Server.Services
                 Timestamp = DateTime.Now
             };
 
+
             if (!response.Success)
             {
                 client.SendMessage(responseMessage);
                 return;
             }
 
+
             foreach (int recipientId in recipients)
             {
                 responseMessage.ReceiverId = recipientId;
+
 
                 if (recipientId == client.UserId)
                 {
@@ -514,9 +654,11 @@ namespace ChatTCP.Server.Services
                 }
             }
 
+
             Console.WriteLine(
                 $"[MessageHandler] Đã cập nhật nhóm ID {groupId}.");
         }
+
 
         // Xử lý lấy danh sách nhóm của người dùng
         private void HandleGetGroupList(Message msg, ClientConnection client)
@@ -528,6 +670,7 @@ namespace ChatTCP.Server.Services
                 {
                     userGroups = _groupManager.GetGroupsForUser(client.UserId);
                 }
+
 
                 Message response = new Message
                 {
@@ -547,6 +690,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         // Xử lý lấy lịch sử tin nhắn (hỗ trợ cả Chat 1-1 và Chat Nhóm từ CSDL)
         private void HandleGetChatHistory(Message msg, ClientConnection client)
         {
@@ -562,6 +706,7 @@ namespace ChatTCP.Server.Services
                         GroupId = msg.GroupId.Value,
                         Messages = messages
                     };
+
 
                     var responseMsg = new Message
                     {
@@ -581,6 +726,7 @@ namespace ChatTCP.Server.Services
                     int partnerId = 0;
                     string partnerUsername = msg.Content?.Trim() ?? string.Empty;
 
+
                     if (msg.ReceiverId.HasValue && msg.ReceiverId.Value > 0)
                     {
                         partnerId = msg.ReceiverId.Value;
@@ -598,6 +744,7 @@ namespace ChatTCP.Server.Services
                             partnerId = partnerUser.UserId;
                         }
                     }
+
 
                     if (partnerId > 0 && client.UserId > 0)
                     {
@@ -622,6 +769,7 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         // Xử lý lấy toàn bộ danh sách người dùng trong CSDL
         private void HandleGetUserList(Message msg, ClientConnection client)
         {
@@ -633,7 +781,9 @@ namespace ChatTCP.Server.Services
                     bool isOnline = _clientManager.GetClient(u.UserId) != null;
                     u.Status = isOnline ? "Online" : "Offline";
                     u.Password = string.Empty; // Không gửi mật khẩu
+                    PopulateAvatarData(u);
                 }
+
 
                 Message response = new Message
                 {
@@ -645,6 +795,7 @@ namespace ChatTCP.Server.Services
                     Timestamp = DateTime.Now
                 };
 
+
                 client.SendMessage(response);
                 Console.WriteLine($"[MessageHandler] Đã gửi danh sách {allUsers.Count} user trong CSDL cho User ID {client.UserId}");
             }
@@ -654,11 +805,14 @@ namespace ChatTCP.Server.Services
             }
         }
 
+
         private class LoginRequestData
         {
             public string Username { get; set; } = string.Empty;
             public string Password { get; set; } = string.Empty;
+            public string? AvatarData { get; set; }
         }
+
 
         private class LoginResponseData
         {
@@ -666,6 +820,7 @@ namespace ChatTCP.Server.Services
             public string Message { get; set; } = string.Empty;
             public User? User { get; set; }
         }
+
 
         private class RegisterResponseData
         {
@@ -675,3 +830,6 @@ namespace ChatTCP.Server.Services
         }
     }
 }
+
+
+
