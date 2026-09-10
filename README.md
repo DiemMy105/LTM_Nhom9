@@ -28,8 +28,10 @@ Hệ thống hỗ trợ các chức năng chính như:
 - Quản lý và cập nhật Avatar.
 - Lưu trữ và xem lại lịch sử trò chuyện.
 - Quản lý dữ liệu người dùng, tin nhắn và nhóm thông qua Database.
-Đối tượng sử dụng của hệ thống là người dùng cần trao đổi tin nhắn trong cùng một hệ thống mạng. Ứng dụng được xây dựng chủ yếu nhằm phục vụ mục đích học tập, nghiên cứu và thực hành các kiến thức về lập trình mạng, TCP Socket, mô hình Client–Server, xử lý đa luồng và quản lý dữ liệu.
-Phạm vi của đề tài tập trung vào việc xây dựng ứng dụng Chat Desktop bằng C# WinForms. Server đóng vai trò tiếp nhận kết nối, quản lý Client và xử lý dữ liệu, trong khi Client cung cấp giao diện để người dùng đăng nhập, gửi và nhận tin nhắn.
+Đối tượng sử dụng của hệ thống là người dùng cần trao đổi tin nhắn trong cùng một hệ thống mạng.
+Ứng dụng được xây dựng chủ yếu nhằm phục vụ mục đích học tập, nghiên cứu và thực hành các kiến thức về lập trình mạng, TCP Socket, mô hình Client–Server, xử lý đa luồng và quản lý dữ liệu.
+Phạm vi của đề tài tập trung vào việc xây dựng ứng dụng Chat Desktop bằng C# WinForms.
+Server đóng vai trò tiếp nhận kết nối, quản lý Client và xử lý dữ liệu, trong khi Client cung cấp giao diện để người dùng đăng nhập, gửi và nhận tin nhắn.
 Dữ liệu được truyền giữa Client và Server thông qua TCP Socket.
 - Server có nhiệm vụ:
 Lắng nghe các kết nối từ Client.
