@@ -792,6 +792,8 @@ namespace ChatTCP.Client.Forms
             // LISTEN TO TCP MESSAGES (UserList & UserStatus)
             _tcpClient.MessageReceived +=
                 OnTcpClientMessageReceived;
+            _tcpClient.Disconnected +=
+                OnTcpClientDisconnected;
             // REQUEST USER LIST FROM DATABASE
             _tcpClient.SendMessage(new ChatMessage
             {
@@ -841,6 +843,7 @@ namespace ChatTCP.Client.Forms
             _activeChatIsGroup =
                 false;
             btnGroupMembers.Visible = false;
+            pnlInput.Enabled = true;
             // HEADER
             lblChatTarget.Text =
                 username;
@@ -1272,6 +1275,7 @@ namespace ChatTCP.Client.Forms
                 if (_tcpClient != null)
                 {
                     _tcpClient.MessageReceived -= OnTcpClientMessageReceived;
+                    _tcpClient.Disconnected -= OnTcpClientDisconnected;
                     _tcpClient.Disconnect();
                 }
                 SessionManager.Instance.ClearSession(true);
@@ -1440,6 +1444,46 @@ namespace ChatTCP.Client.Forms
                     }
                     catch { }
                     break;
+                case MessageType.SystemNotification:
+                    try
+                    {
+                        if (message.Content != null && message.Content.StartsWith("KICKED:"))
+                        {
+                            string notice = message.Content.Substring("KICKED:".Length);
+                            _isDisconnectedHandled = true;
+                            InvokeIfRequired(() =>
+                            {
+                                MessageBox.Show(
+                                    notice,
+                                    "Ngắt kết nối từ Server",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Warning
+                                );
+                                IsLoggingOut = true;
+                                Close();
+                            });
+                            return;
+                        }
+                        else if (message.Content != null && message.Content.StartsWith("DELETED:"))
+                        {
+                            string notice = message.Content.Substring("DELETED:".Length);
+                            _isDisconnectedHandled = true;
+                            InvokeIfRequired(() =>
+                            {
+                                MessageBox.Show(
+                                    notice,
+                                    "Tài khoản bị xóa",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Warning
+                                );
+                                IsLoggingOut = true;
+                                Close();
+                            });
+                            return;
+                        }
+                    }
+                    catch { }
+                    break;
                 case MessageType.UserStatusUpdate:
                     try
                     {
@@ -1448,12 +1492,32 @@ namespace ChatTCP.Client.Forms
                         {
                             InvokeIfRequired(() =>
                             {
+                                if (string.Equals(user.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    if (string.Equals(user.Status, "Deleted", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        MessageBox.Show(
+                                            "Tài khoản của bạn đã bị Quản trị viên xóa khỏi hệ thống.",
+                                            "Thông báo",
+                                            MessageBoxButtons.OK,
+                                            MessageBoxIcon.Warning
+                                        );
+                                        _tcpClient?.Disconnect();
+                                        Close();
+                                    }
+                                    return;
+                                }
+
+                                if (string.Equals(user.Status, "Deleted", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    RemoveUserFromList(user.Username);
+                                    return;
+                                }
+
                                 if (!string.IsNullOrWhiteSpace(user.AvatarData))
                                 {
                                     ImageUtils.SaveAvatarFromBase64(user.Avatar, user.AvatarData);
                                 }
-                                if (string.Equals(user.Username, _currentUsername, StringComparison.OrdinalIgnoreCase))
-                                    return;
                                 bool isOnline = string.Equals(user.Status, "Online", StringComparison.OrdinalIgnoreCase);
                                 AddUserToList(user.Username, isOnline, user);
                             });
@@ -1491,6 +1555,51 @@ namespace ChatTCP.Client.Forms
                     }
                     catch { }
                     break;
+            }
+        }
+        private bool _isDisconnectedHandled = false;
+
+        private void OnTcpClientDisconnected()
+        {
+            if (IsLoggingOut || _isDisconnectedHandled)
+                return;
+
+            _isDisconnectedHandled = true;
+
+            InvokeIfRequired(() =>
+            {
+                MessageBox.Show(
+                    "Bạn đã bị Server ngắt kết nối hoặc mất kết nối tới máy chủ.",
+                    "Thông báo ngắt kết nối",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+
+                IsLoggingOut = true;
+                Close();
+            });
+        }
+        // REMOVE USER
+        private void RemoveUserFromList(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username)) return;
+
+            _onlineUsersByName.Remove(username);
+
+            if (_userItems.TryGetValue(username, out var item))
+            {
+                lvUsers.Items.Remove(item);
+                _userItems.Remove(username);
+            }
+
+            if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
+            {
+                _activeChatTarget = null;
+                lblChatTarget.Text = "Chat";
+                lblChatStatus.Text = $"Người dùng \"{username}\" đã bị xóa khỏi hệ thống";
+                lblChatStatus.ForeColor = Color.Crimson;
+                flpMessages.Controls.Clear();
+                pnlInput.Enabled = false;
             }
         }
         // ADD USER
