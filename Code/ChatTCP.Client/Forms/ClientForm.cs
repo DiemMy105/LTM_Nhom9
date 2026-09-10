@@ -78,6 +78,15 @@ namespace ChatTCP.Client.Forms
         private readonly Dictionary<string, ListViewItem>
             _groupItems =
                 new Dictionary<string, ListViewItem>();
+        // UNREAD MESSAGE COUNTERS
+        private readonly Dictionary<string, int>
+            _unreadCountsByUser =
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int>
+            _unreadCountsByGroup =
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Color DeepRedBadgeColor =
+            Color.FromArgb(175, 35, 35);
         // AVATAR & CHAT STATE
         private Image? _myAvatar;
         private DateTime? _lastRenderedDate = null;
@@ -285,11 +294,18 @@ namespace ChatTCP.Client.Forms
                     HeaderStyle =
                         ColumnHeaderStyle.None,
                     ContextMenuStrip =
-                        cmsUsers
+                        cmsUsers,
+                    OwnerDraw = true
                 };
             lvUsers.Columns.Add(
                 "User",
                 216);
+            var dummyImageListUsers = new ImageList { ImageSize = new Size(1, 30) };
+            lvUsers.SmallImageList = dummyImageListUsers;
+            EnableDoubleBuffer(lvUsers);
+            lvUsers.DrawItem += (s, e) => { };
+            lvUsers.DrawSubItem += LvUsers_DrawSubItem;
+            lvUsers.DrawColumnHeader += (s, e) => { e.DrawDefault = true; };
             lvUsers.MouseDown +=
                 LvUsers_MouseDown;
             lvUsers.Click +=
@@ -316,11 +332,18 @@ namespace ChatTCP.Client.Forms
                     GridLines =
                         false,
                     HeaderStyle =
-                        ColumnHeaderStyle.None
+                        ColumnHeaderStyle.None,
+                    OwnerDraw = true
                 };
             lvGroups.Columns.Add(
                 "Group",
                 216);
+            var dummyImageListGroups = new ImageList { ImageSize = new Size(1, 30) };
+            lvGroups.SmallImageList = dummyImageListGroups;
+            EnableDoubleBuffer(lvGroups);
+            lvGroups.DrawItem += (s, e) => { };
+            lvGroups.DrawSubItem += LvGroups_DrawSubItem;
+            lvGroups.DrawColumnHeader += (s, e) => { e.DrawDefault = true; };
             lvGroups.Click +=
                 (s, e) =>
                     OpenChatWithGroup();
@@ -842,6 +865,15 @@ namespace ChatTCP.Client.Forms
                 username;
             _activeChatIsGroup =
                 false;
+
+            // Reset unread count for this user
+            if (_unreadCountsByUser.ContainsKey(username))
+            {
+                _unreadCountsByUser[username] = 0;
+                lvUsers.Invalidate();
+                UpdateTabTitles();
+            }
+
             btnGroupMembers.Visible = false;
             pnlInput.Enabled = true;
             // HEADER
@@ -900,6 +932,15 @@ namespace ChatTCP.Client.Forms
                 groupName;
             _activeChatIsGroup =
                 true;
+
+            // Reset unread count for this group
+            if (_unreadCountsByGroup.ContainsKey(groupName))
+            {
+                _unreadCountsByGroup[groupName] = 0;
+                lvGroups.Invalidate();
+                UpdateTabTitles();
+            }
+
             btnGroupMembers.Visible = true;
             lblChatTarget.Text =
                 groupName;
@@ -1355,6 +1396,48 @@ namespace ChatTCP.Client.Forms
                         message,
                         isMine: false);
                 }
+                else
+                {
+                    // Tăng số lượng tin nhắn chưa đọc và cập nhật giao diện
+                    if (!isGroupMessage)
+                    {
+                        if (!string.IsNullOrWhiteSpace(message.SenderName) &&
+                            !string.Equals(message.SenderName, _currentUsername, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!_userItems.ContainsKey(message.SenderName))
+                            {
+                                AddUserToList(message.SenderName, true);
+                            }
+                            _unreadCountsByUser.TryGetValue(message.SenderName, out int currentCount);
+                            _unreadCountsByUser[message.SenderName] = currentCount + 1;
+                            lvUsers.Invalidate();
+                            UpdateTabTitles();
+                        }
+                    }
+                    else
+                    {
+                        string? groupName = null;
+                        if (message.GroupId.HasValue)
+                        {
+                            var gObj = _groupsByName.Values.FirstOrDefault(g => g.GroupId == message.GroupId.Value);
+                            if (gObj != null)
+                            {
+                                groupName = gObj.GroupName;
+                            }
+                        }
+                        if (!string.IsNullOrWhiteSpace(groupName))
+                        {
+                            if (!_groupItems.ContainsKey(groupName))
+                            {
+                                AddGroupToList(groupName);
+                            }
+                            _unreadCountsByGroup.TryGetValue(groupName, out int currentCount);
+                            _unreadCountsByGroup[groupName] = currentCount + 1;
+                            lvGroups.Invalidate();
+                            UpdateTabTitles();
+                        }
+                    }
+                }
             });
         }
         // USER STATUS
@@ -1585,12 +1668,15 @@ namespace ChatTCP.Client.Forms
             if (string.IsNullOrWhiteSpace(username)) return;
 
             _onlineUsersByName.Remove(username);
+            _unreadCountsByUser.Remove(username);
 
             if (_userItems.TryGetValue(username, out var item))
             {
                 lvUsers.Items.Remove(item);
                 _userItems.Remove(username);
             }
+            lvUsers.Invalidate();
+            UpdateTabTitles();
 
             if (!_activeChatIsGroup && string.Equals(_activeChatTarget, username, StringComparison.OrdinalIgnoreCase))
             {
@@ -1686,6 +1772,7 @@ namespace ChatTCP.Client.Forms
                 isOnline
                     ? Color.Black
                     : Color.Gray;
+            lvUsers.Invalidate();
         }
         // ADD GROUP
         private void AddGroupToList(
@@ -1788,7 +1875,7 @@ namespace ChatTCP.Client.Forms
 
 
             string groupName = pair.Key;
-
+            _unreadCountsByGroup.Remove(groupName);
 
             if (_groupItems.TryGetValue(
                 groupName,
@@ -1798,8 +1885,9 @@ namespace ChatTCP.Client.Forms
                 _groupItems.Remove(groupName);
             }
 
-
             _groupsByName.Remove(groupName);
+            lvGroups.Invalidate();
+            UpdateTabTitles();
 
 
             if (_activeChatIsGroup &&
@@ -2475,6 +2563,242 @@ namespace ChatTCP.Client.Forms
             {
                 action();
             }
+        }
+
+        // DOUBLE BUFFER HELPER
+        private static void EnableDoubleBuffer(Control control)
+        {
+            try
+            {
+                typeof(Control).InvokeMember(
+                    "DoubleBuffered",
+                    System.Reflection.BindingFlags.SetProperty |
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic,
+                    null, control, new object[] { true });
+            }
+            catch
+            {
+            }
+        }
+
+        // ROUNDED RECTANGLE PATH HELPER
+        private static GraphicsPath CreateRoundedRectanglePath(Rectangle rect, int radius)
+        {
+            var path = new GraphicsPath();
+            int diameter = radius * 2;
+            if (diameter > rect.Width) diameter = rect.Width;
+            if (diameter > rect.Height) diameter = rect.Height;
+
+            var arc = new Rectangle(rect.Location, new Size(diameter, diameter));
+
+            // Top left
+            path.AddArc(arc, 180, 90);
+
+            // Top right
+            arc.X = rect.Right - diameter;
+            path.AddArc(arc, 270, 90);
+
+            // Bottom right
+            arc.Y = rect.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+
+            // Bottom left
+            arc.X = rect.Left;
+            path.AddArc(arc, 90, 90);
+
+            path.CloseFigure();
+            return path;
+        }
+
+        // DRAW USER LIST ITEM (WITH ONLINE STATUS & UNREAD BADGE)
+        private void LvUsers_DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.Item == null) return;
+
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            bool isSelected = e.Item.Selected;
+            string username = e.Item.Tag as string ?? e.Item.Text;
+
+            bool isOnline = false;
+            if (_onlineUsersByName.TryGetValue(username, out var userObj))
+            {
+                isOnline = string.Equals(userObj.Status, "Online", StringComparison.OrdinalIgnoreCase);
+            }
+
+            // 1. Draw Background
+            Color backColor = isSelected ? Color.FromArgb(230, 240, 255) : Color.White;
+            using (var bgBrush = new SolidBrush(backColor))
+            {
+                g.FillRectangle(bgBrush, e.Bounds);
+            }
+
+            // 2. Draw Status Dot
+            int dotDiameter = 8;
+            int dotX = e.Bounds.Left + 10;
+            int dotY = e.Bounds.Top + (e.Bounds.Height - dotDiameter) / 2;
+            Color dotColor = isOnline ? Color.FromArgb(34, 197, 94) : Color.FromArgb(156, 163, 175);
+            using (var dotBrush = new SolidBrush(dotColor))
+            {
+                g.FillEllipse(dotBrush, dotX, dotY, dotDiameter, dotDiameter);
+            }
+
+            // 3. Draw Unread Badge
+            int rightLimit = e.Bounds.Right - 8;
+            _unreadCountsByUser.TryGetValue(username, out int unreadCount);
+            if (unreadCount > 0)
+            {
+                string badgeText = unreadCount > 10 ? "10+" : unreadCount.ToString();
+                using var badgeFont = new Font("Segoe UI", 7.5F, FontStyle.Bold);
+                var textSize = g.MeasureString(badgeText, badgeFont);
+                int badgeHeight = 16;
+                int badgeWidth = Math.Max(18, (int)Math.Ceiling(textSize.Width) + 6);
+                int badgeX = e.Bounds.Right - badgeWidth - 8;
+                int badgeY = e.Bounds.Top + (e.Bounds.Height - badgeHeight) / 2;
+                var badgeRect = new Rectangle(badgeX, badgeY, badgeWidth, badgeHeight);
+
+                using var badgeBrush = new SolidBrush(DeepRedBadgeColor);
+                using var badgePath = CreateRoundedRectanglePath(badgeRect, badgeHeight / 2);
+                g.FillPath(badgeBrush, badgePath);
+
+                using var textBrush = new SolidBrush(Color.White);
+                using var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                g.DrawString(badgeText, badgeFont, textBrush, new RectangleF(badgeRect.X, badgeRect.Y + 0.5f, badgeRect.Width, badgeRect.Height), sf);
+
+                rightLimit = badgeX - 4;
+            }
+
+            // 4. Draw Username Text
+            int textX = dotX + dotDiameter + 8;
+            int textY = e.Bounds.Top;
+            int textWidth = Math.Max(10, rightLimit - textX);
+            var textRect = new Rectangle(textX, textY, textWidth, e.Bounds.Height);
+
+            Color textColor = isOnline ? Color.FromArgb(30, 41, 59) : Color.FromArgb(148, 163, 184);
+            FontStyle fontStyle = unreadCount > 0 ? FontStyle.Bold : FontStyle.Regular;
+            using var userFont = new Font("Segoe UI", 9.5F, fontStyle);
+            using var userTextBrush = new SolidBrush(textColor);
+            using var userSf = new StringFormat
+            {
+                Alignment = StringAlignment.Near,
+                LineAlignment = StringAlignment.Center,
+                Trimming = StringTrimming.EllipsisCharacter,
+                FormatFlags = StringFormatFlags.NoWrap
+            };
+            g.DrawString(username, userFont, userTextBrush, textRect, userSf);
+
+            if (isSelected)
+            {
+                using var barBrush = new SolidBrush(Color.FromArgb(30, 90, 180));
+                g.FillRectangle(barBrush, new Rectangle(e.Bounds.Left, e.Bounds.Top, 3, e.Bounds.Height));
+            }
+        }
+
+        // DRAW GROUP LIST ITEM (WITH UNREAD BADGE)
+        private void LvGroups_DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.Item == null) return;
+
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            bool isSelected = e.Item.Selected;
+            string groupName = e.Item.Text;
+
+            // 1. Draw Background
+            Color backColor = isSelected ? Color.FromArgb(230, 240, 255) : Color.White;
+            using (var bgBrush = new SolidBrush(backColor))
+            {
+                g.FillRectangle(bgBrush, e.Bounds);
+            }
+
+            // 2. Draw Group Dot Indicator
+            int dotDiameter = 8;
+            int dotX = e.Bounds.Left + 10;
+            int dotY = e.Bounds.Top + (e.Bounds.Height - dotDiameter) / 2;
+            Color dotColor = Color.FromArgb(59, 130, 246);
+            using (var dotBrush = new SolidBrush(dotColor))
+            {
+                g.FillEllipse(dotBrush, dotX, dotY, dotDiameter, dotDiameter);
+            }
+
+            // 3. Draw Unread Badge
+            int rightLimit = e.Bounds.Right - 8;
+            _unreadCountsByGroup.TryGetValue(groupName, out int unreadCount);
+            if (unreadCount > 0)
+            {
+                string badgeText = unreadCount > 10 ? "10+" : unreadCount.ToString();
+                using var badgeFont = new Font("Segoe UI", 7.5F, FontStyle.Bold);
+                var textSize = g.MeasureString(badgeText, badgeFont);
+                int badgeHeight = 16;
+                int badgeWidth = Math.Max(18, (int)Math.Ceiling(textSize.Width) + 6);
+                int badgeX = e.Bounds.Right - badgeWidth - 8;
+                int badgeY = e.Bounds.Top + (e.Bounds.Height - badgeHeight) / 2;
+                var badgeRect = new Rectangle(badgeX, badgeY, badgeWidth, badgeHeight);
+
+                using var badgeBrush = new SolidBrush(DeepRedBadgeColor);
+                using var badgePath = CreateRoundedRectanglePath(badgeRect, badgeHeight / 2);
+                g.FillPath(badgeBrush, badgePath);
+
+                using var textBrush = new SolidBrush(Color.White);
+                using var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                g.DrawString(badgeText, badgeFont, textBrush, new RectangleF(badgeRect.X, badgeRect.Y + 0.5f, badgeRect.Width, badgeRect.Height), sf);
+
+                rightLimit = badgeX - 4;
+            }
+
+            // 4. Draw Group Name Text
+            int textX = dotX + dotDiameter + 8;
+            int textY = e.Bounds.Top;
+            int textWidth = Math.Max(10, rightLimit - textX);
+            var textRect = new Rectangle(textX, textY, textWidth, e.Bounds.Height);
+
+            FontStyle fontStyle = unreadCount > 0 ? FontStyle.Bold : FontStyle.Regular;
+            using var groupFont = new Font("Segoe UI", 9.5F, fontStyle);
+            using var groupTextBrush = new SolidBrush(Color.FromArgb(30, 41, 59));
+            using var sfGroup = new StringFormat
+            {
+                Alignment = StringAlignment.Near,
+                LineAlignment = StringAlignment.Center,
+                Trimming = StringTrimming.EllipsisCharacter,
+                FormatFlags = StringFormatFlags.NoWrap
+            };
+            g.DrawString(groupName, groupFont, groupTextBrush, textRect, sfGroup);
+
+            if (isSelected)
+            {
+                using var barBrush = new SolidBrush(Color.FromArgb(30, 90, 180));
+                g.FillRectangle(barBrush, new Rectangle(e.Bounds.Left, e.Bounds.Top, 3, e.Bounds.Height));
+            }
+        }
+
+        // UPDATE TAB TITLES WITH UNREAD COUNT
+        private void UpdateTabTitles()
+        {
+            if (tabUsers == null || tabGroups == null) return;
+
+            int totalUsersUnread = _unreadCountsByUser.Values.Sum();
+            int totalGroupsUnread = _unreadCountsByGroup.Values.Sum();
+
+            tabUsers.Text = totalUsersUnread > 0
+                ? $"Users ({(totalUsersUnread > 10 ? "10+" : totalUsersUnread.ToString())})"
+                : "Users";
+
+            tabGroups.Text = totalGroupsUnread > 0
+                ? $"Groups ({(totalGroupsUnread > 10 ? "10+" : totalGroupsUnread.ToString())})"
+                : "Groups";
         }
     }
 }
