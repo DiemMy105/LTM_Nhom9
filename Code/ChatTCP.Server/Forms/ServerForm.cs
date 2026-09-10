@@ -64,8 +64,7 @@ namespace ChatTCP.Server.Forms
 
         private ContextMenuStrip cmsClients = null!;
         private ToolStripMenuItem miKickClient = null!;
-        private ToolStripMenuItem miViewClientInfo = null!;
-        private ToolStripMenuItem miRefreshClients = null!;
+        private ToolStripMenuItem miDeleteUser = null!;
 
 
         private ContextMenuStrip cmsGroups = null!;
@@ -250,34 +249,21 @@ namespace ChatTCP.Server.Forms
 
             cmsClients = new ContextMenuStrip();
 
-
-            miViewClientInfo = new ToolStripMenuItem("Xem thông tin chi tiết");
-            miViewClientInfo.Click += MiViewClientInfo_Click;
-
-
-            miKickClient = new ToolStripMenuItem("Ngắt kết nối (Kick)");
+            miKickClient = new ToolStripMenuItem("⚡ Ngắt kết nối (Disconnect)");
             miKickClient.Click += MiKickClient_Click;
 
+            miDeleteUser = new ToolStripMenuItem("🗑 Xóa người dùng (Delete User)");
+            miDeleteUser.Click += MiDeleteUser_Click;
 
-            miRefreshClients = new ToolStripMenuItem("Làm mới danh sách người dùng");
-            miRefreshClients.Click += MiRefreshClients_Click;
-
-
-            cmsClients.Items.Add(miViewClientInfo);
             cmsClients.Items.Add(miKickClient);
-            cmsClients.Items.Add(new ToolStripSeparator());
-            cmsClients.Items.Add(miRefreshClients);
-
+            cmsClients.Items.Add(miDeleteUser);
 
             // GROUP CONTEXT MENU
 
-
             cmsGroups = new ContextMenuStrip();
-
 
             miViewGroupMembers = new ToolStripMenuItem("Xem thành viên nhóm");
             miViewGroupMembers.Click += MiViewGroupMembers_Click;
-
 
             var miRefreshGroups = new ToolStripMenuItem("Làm mới danh sách nhóm");
             miRefreshGroups.Click += (s, e) =>
@@ -286,24 +272,19 @@ namespace ChatTCP.Server.Forms
                 AppendLog("[SYSTEM] Đã làm mới danh sách nhóm chat.");
             };
 
-
             cmsGroups.Items.Add(miViewGroupMembers);
             cmsGroups.Items.Add(new ToolStripSeparator());
             cmsGroups.Items.Add(miRefreshGroups);
 
-
             // TAB CONTROL
-
 
             tabMain = new TabControl
             {
                 Dock = DockStyle.Fill
             };
 
-
             // Tab 1: Clients / Users
             tabClients = new TabPage("Danh sách người dùng");
-
 
             lvClients = new ListView
             {
@@ -316,15 +297,61 @@ namespace ChatTCP.Server.Forms
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular)
             };
 
-
             lvClients.Columns.Add("ID", 70, HorizontalAlignment.Center);
             lvClients.Columns.Add("Username", 170, HorizontalAlignment.Left);
             lvClients.Columns.Add("Tên hiển thị", 200, HorizontalAlignment.Left);
             lvClients.Columns.Add("Trạng thái", 140, HorizontalAlignment.Left);
 
-
             lvClients.MouseDown += LvClients_MouseDown;
+
+            // CLIENTS ACTION TOOLBAR
+            var pnlClientsAction = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 46,
+                Padding = new Padding(8, 6, 8, 6),
+                FlowDirection = FlowDirection.LeftToRight,
+                BackColor = Color.FromArgb(245, 247, 250)
+            };
+
+            var btnDisconnectClient = new Button
+            {
+                Text = "⚡ Ngắt kết nối",
+                Width = 145,
+                Height = 34,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(235, 130, 60),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 10, 0)
+            };
+            btnDisconnectClient.FlatAppearance.BorderSize = 0;
+            btnDisconnectClient.Click += MiKickClient_Click;
+
+            var btnDeleteUser = new Button
+            {
+                Text = "🗑 Xóa người dùng",
+                Width = 155,
+                Height = 34,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(215, 50, 50),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 10, 0)
+            };
+            btnDeleteUser.FlatAppearance.BorderSize = 0;
+            btnDeleteUser.Click += MiDeleteUser_Click;
+
+            pnlClientsAction.Controls.AddRange(new Control[]
+            {
+                btnDisconnectClient,
+                btnDeleteUser
+            });
+
             tabClients.Controls.Add(lvClients);
+            tabClients.Controls.Add(pnlClientsAction);
 
 
             // Tab 2: Groups
@@ -1061,41 +1088,23 @@ namespace ChatTCP.Server.Forms
         }
 
 
-        private void MiViewClientInfo_Click(object? sender, EventArgs e)
-        {
-            if (lvClients.SelectedItems.Count == 0)
-                return;
-
-
-            var item = lvClients.SelectedItems[0];
-            string id = item.SubItems[0].Text;
-            string username = item.SubItems[1].Text;
-            string displayName = item.SubItems[2].Text;
-            string status = item.SubItems[3].Text;
-
-
-            MessageBox.Show(
-                $"ID: {id}\n" +
-                $"Username: {username}\n" +
-                $"Tên hiển thị: {displayName}\n" +
-                $"Trạng thái: {status}",
-                "Thông tin người dùng",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
-        }
-
-
         private void MiKickClient_Click(object? sender, EventArgs e)
         {
             if (lvClients.SelectedItems.Count == 0)
+            {
+                MessageBox.Show(
+                    "Vui lòng chọn một người dùng để ngắt kết nối.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
                 return;
-
+            }
 
             var item = lvClients.SelectedItems[0];
+            int userId = item.Tag is int id ? id : (int.TryParse(item.SubItems[0].Text, out int parsedId) ? parsedId : 0);
             string username = item.SubItems[1].Text;
             string status = item.SubItems[3].Text;
-
 
             if (!status.Contains("Online"))
             {
@@ -1108,28 +1117,179 @@ namespace ChatTCP.Server.Forms
                 return;
             }
 
-
             var confirm = MessageBox.Show(
-                $"Bạn có chắc muốn ngắt kết nối \"{username}\"?",
-                "Xác nhận Kick",
+                $"Bạn có chắc muốn ngắt kết nối người dùng \"{username}\" (ID: {userId})?",
+                "Xác nhận ngắt kết nối",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning
             );
 
+            if (confirm != DialogResult.Yes)
+                return;
+
+            // 1. Gửi thông báo trực tiếp đến client bị ngắt kết nối trước khi đóng socket
+            var client = _clientManager?.GetClient(userId) ?? _clientManager?.GetClient(username);
+            if (client != null)
+            {
+                var kickNotice = new Message
+                {
+                    SenderId = 0,
+                    SenderName = "Server",
+                    ReceiverId = userId,
+                    Type = ChatTCP.Shared.Enums.MessageType.SystemNotification,
+                    Content = "KICKED:Bạn đã bị ngắt kết nối khỏi máy chủ bởi Quản trị viên (Admin).",
+                    Timestamp = DateTime.Now
+                };
+                client.SendMessage(kickNotice);
+                System.Threading.Thread.Sleep(80);
+
+                _clientManager?.RemoveClient(client);
+                client.Disconnect();
+            }
+            else
+            {
+                _clientManager?.DisconnectClient(username);
+                _clientManager?.RemoveClient(userId);
+            }
+
+            // 2. Cập nhật Database
+            if (userId > 0)
+            {
+                _databaseService?.UpdateUserStatus(userId, "Offline");
+            }
+
+            // 3. Chuyển trạng thái giao diện Server ngay lập tức về Offline
+            SetUserOffline(userId);
+
+            // 4. Broadcast thông báo Offline tới các Client khác
+            var statusMsg = new Message
+            {
+                SenderId = userId,
+                SenderName = username,
+                Type = ChatTCP.Shared.Enums.MessageType.UserStatusUpdate,
+                Content = System.Text.Json.JsonSerializer.Serialize(new User
+                {
+                    UserId = userId,
+                    Username = username,
+                    Status = "Offline"
+                }),
+                Timestamp = DateTime.Now
+            };
+            _clientManager?.Broadcast(statusMsg);
+
+            AppendLog($"[DISCONNECT] Đã ngắt kết nối người dùng \"{username}\" (ID: {userId}) bởi Admin.");
+        }
+
+
+        private void MiDeleteUser_Click(object? sender, EventArgs e)
+        {
+            if (lvClients.SelectedItems.Count == 0)
+            {
+                MessageBox.Show(
+                    "Vui lòng chọn một người dùng để xóa.",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return;
+            }
+
+            var item = lvClients.SelectedItems[0];
+            int userId = item.Tag is int id ? id : (int.TryParse(item.SubItems[0].Text, out int parsedId) ? parsedId : 0);
+            string username = item.SubItems[1].Text;
+
+            if (userId <= 0)
+            {
+                MessageBox.Show(
+                    "Không thể xác định UserId của người dùng cần xóa.",
+                    "Lỗi",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"CẢNH BÁO: Xóa người dùng \"{username}\" (ID: {userId}) sẽ xóa TOÀN BỘ dữ liệu liên quan (tin nhắn, lịch sử chat, tham gia nhóm) khỏi cơ sở dữ liệu!\n\nBạn có chắc chắn muốn xóa không?",
+                "Xác nhận xóa người dùng",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Stop
+            );
 
             if (confirm != DialogResult.Yes)
                 return;
 
+            // 1. Nếu client đang online, gửi thông báo tài khoản bị xóa và ngắt kết nối
+            var client = _clientManager?.GetClient(userId) ?? _clientManager?.GetClient(username);
+            if (client != null)
+            {
+                var deleteNotice = new Message
+                {
+                    SenderId = 0,
+                    SenderName = "Server",
+                    ReceiverId = userId,
+                    Type = ChatTCP.Shared.Enums.MessageType.SystemNotification,
+                    Content = "DELETED:Tài khoản của bạn đã bị Quản trị viên xóa hoàn toàn khỏi hệ thống.",
+                    Timestamp = DateTime.Now
+                };
+                client.SendMessage(deleteNotice);
+                System.Threading.Thread.Sleep(80);
 
-            _clientManager?.DisconnectClient(username);
-            AppendLog($"[SYSTEM] Đã ngắt kết nối \"{username}\" (Kick bởi Admin).");
-        }
+                _clientManager?.RemoveClient(client);
+                client.Disconnect();
+            }
+            else
+            {
+                _clientManager?.DisconnectClient(username);
+                _clientManager?.RemoveClient(userId);
+            }
 
+            // 2. Xóa toàn bộ dữ liệu người dùng khỏi Database
+            if (_databaseService != null && !_databaseService.DeleteUser(userId, out string dbError))
+            {
+                MessageBox.Show(
+                    $"Xóa người dùng khỏi CSDL thất bại:\n{dbError}",
+                    "Lỗi CSDL",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return;
+            }
 
-        private void MiRefreshClients_Click(object? sender, EventArgs e)
-        {
-            LoadAllUsersFromDatabase();
-            AppendLog("[SYSTEM] Đã làm mới danh sách người dùng.");
+            // 3. Broadcast thông báo User đã bị xóa tới các Client còn lại
+            var deleteMsg = new Message
+            {
+                SenderId = userId,
+                SenderName = username,
+                Type = ChatTCP.Shared.Enums.MessageType.UserStatusUpdate,
+                Content = System.Text.Json.JsonSerializer.Serialize(new User
+                {
+                    UserId = userId,
+                    Username = username,
+                    Status = "Deleted"
+                }),
+                Timestamp = DateTime.Now
+            };
+            _clientManager?.Broadcast(deleteMsg);
+
+            // 4. Xóa ngay lập tức khỏi giao diện Server
+            if (_userItems.TryGetValue(userId, out var listItem))
+            {
+                lvClients.Items.Remove(listItem);
+                _userItems.Remove(userId);
+            }
+            UpdateClientCount();
+
+            // 5. Cập nhật lại danh sách nhóm (nếu user có trong các nhóm)
+            LoadAllGroupsFromDatabase();
+
+            AppendLog($"[DELETE USER] Đã xóa vĩnh viễn người dùng \"{username}\" (ID: {userId}) và toàn bộ dữ liệu liên quan khỏi hệ thống.");
+            MessageBox.Show(
+                $"Đã xóa người dùng \"{username}\" thành công.",
+                "Thành công",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
         }
 
 
