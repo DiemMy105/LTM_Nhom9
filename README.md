@@ -7,7 +7,7 @@ UDM_08 — Chat TCP Client–Server
 |---:|---|---|---|
 | 1 | 075306001575 | Nguyễn Hồ Diễm My | Phân công, theo dõi tiến độ, lập trình tính năng chat 1-1, xây dựng module kết nối socket phía client, xử lý định tuyến tin nhắn cá nhân giữa 2 client, gửi/nhận tin nhắn 1-1, làm word, tổng hợp báo cáo word, powerpoint |
 | 2 | 042205011735 | Võ Tùng Sơn | Cài đặt module Đăng nhập và Đăng ký, thiết kế Database, triển khai cơ chế băm mật khẩu và kiểm tra mật khẩu, xử lý lưu trữ tin nhắn/dữ liệu người dùng, làm word, powerpoint |
-| 3 | 056206002399 | Võ Duy Thịnh | Lập trình, theo dõi luồng TCP Socket để cập nhật trạng thái online/offline theo thời gian thực, kiểm tra tính năng query tin nhắn cũ từ CSDL khi người dùng mở khung chat (lịch sử chat), hiển thị thông báo chấm đỏ ở giao diện khi có tin nhắn mới (chưa đọc), làm word, powerpoint |
+| 3 | 056206002399 | Võ Duy Thịnh | Lập trình, truy vấn danh sách users và groups, xóa và ngắt kết nối client trên giao diện server, cập nhật trạng thái online,offline của client khi đăng nhập, đăng xuất, hiển thị số lượng tin nhắn mới chưa đọc, làm word, powerpoint |
 | 4 | 082205013580 | Lưu Quốc Phú | Lập trình tính năng chat group, xử lý phát sóng tin nhắn nhóm tới các client trong nhóm, gửi/nhận tin nhắn nhóm, phối hợp hiện thị danh sách nhóm lên giao diện, làm word, powerpoint |
 | 5 | 083206006476 | Nguyễn Hồ Hùng Phương | Thiết kế Giao diện Client & Server,hiển thị IP/Port, chức năng xử lý avatar mặc định và upload avatar, thực hiện test case, powerpoint. |
 | 6 | 001206022589 | Nguyễn Đặng Thái Bình | Lập trình các tính năng tin nhắn mở rộng: Forward (Chuyển tiếp), Reply, Xử lý mã hóa & hiển thị Emoji, chat bubble, làm word, powerpoint |
