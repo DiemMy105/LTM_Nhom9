@@ -5,10 +5,10 @@ UDM_08 — Chat TCP Client–Server
 
 | STT | MSSV | Họ và tên | Vai trò |
 |---:|---|---|---|
-| 1 | 075306001575 | Nguyễn Hồ Diễm My | Phân công, theo dõi tiến độ, lập trình tính năng chat 1-1, xây dựng module kết nối socket phía client, xử lý định tuyến tin nhắn cá nhân giữa 2 client, gửi/nhận tin nhắn 1-1, làm word, tổng hợp báo cáo word, powerpoint |
-| 2 | 042205011735 | Võ Tùng Sơn | Cài đặt module Đăng nhập và Đăng ký, thiết kế Database, triển khai cơ chế băm mật khẩu và kiểm tra mật khẩu, xử lý lưu trữ tin nhắn/dữ liệu người dùng, làm word, powerpoint |
-| 3 | 056206002399 | Võ Duy Thịnh | Lập trình, truy vấn danh sách users và groups, xóa và ngắt kết nối client trên giao diện server, cập nhật trạng thái online,offline của client khi đăng nhập, đăng xuất, hiển thị số lượng tin nhắn mới chưa đọc, làm word, powerpoint |
-| 4 | 082205013580 | Lưu Quốc Phú | Lập trình tính năng chat group, xử lý phát sóng tin nhắn nhóm tới các client trong nhóm, gửi/nhận tin nhắn nhóm, phối hợp hiện thị danh sách nhóm lên giao diện, làm word, powerpoint |
+| 1 | 075306001575 | Nguyễn Hồ Diễm My | Phân công, theo dõi tiến độ, lập trình tính năng chat 1-1, xây dựng module kết nối socket phía client, xử lý định tuyến tin nhắn cá nhân giữa 2 client, gửi/nhận tin nhắn 1-1, thực hiện test case, làm word, tổng hợp báo cáo word, powerpoint |
+| 2 | 042205011735 | Võ Tùng Sơn | Cài đặt module Đăng nhập và Đăng ký, thiết kế Database, triển khai cơ chế băm mật khẩu và kiểm tra mật khẩu, xử lý lưu trữ tin nhắn/dữ liệu người dùng, thực hiện test case, làm word, powerpoint |
+| 3 | 056206002399 | Võ Duy Thịnh | Lập trình, truy vấn danh sách users và groups, xóa và ngắt kết nối client trên giao diện server, cập nhật trạng thái online,offline của client khi đăng nhập, đăng xuất, hiển thị số lượng tin nhắn mới chưa đọc,  thực hiện test case, làm word, powerpoint |
+| 4 | 082205013580 | Lưu Quốc Phú | Lập trình tính năng chat group, xử lý phát sóng tin nhắn nhóm tới các client trong nhóm, gửi/nhận tin nhắn nhóm, phối hợp hiện thị danh sách nhóm lên giao diện, thực hiện test case, làm word, powerpoint |
 | 5 | 083206006476 | Nguyễn Hồ Hùng Phương | Thiết kế Giao diện Client & Server,hiển thị IP/Port, chức năng xử lý avatar mặc định và upload avatar, thực hiện test case, powerpoint. |
 | 6 | 001206022589 | Nguyễn Đặng Thái Bình | Lập trình các tính năng tin nhắn mở rộng: Forward (Chuyển tiếp), Reply, Xử lý mã hóa & hiển thị Emoji, chat bubble, làm word, powerpoint |
 
@@ -27,8 +27,8 @@ Hệ thống hỗ trợ các chức năng chính như:
 - Hiển thị thông báo tin nhắn mới, chưa đọc.
 - Quản lý và cập nhật Avatar.
 - Lưu trữ và xem lại lịch sử trò chuyện.
-- Quản lý dữ liệu người dùng, tin nhắn và nhóm thông qua Database.
-Đối tượng sử dụng của hệ thống là người dùng cần trao đổi tin nhắn trong cùng một hệ thống mạng.
+- Quản lý dữ liệu người dùng, tin nhắn và nhóm thông qua Database.  
+Đối tượng sử dụng của hệ thống là người dùng cần trao đổi tin nhắn trong cùng một hệ thống mạng.  
 Ứng dụng được xây dựng chủ yếu nhằm phục vụ mục đích học tập, nghiên cứu và thực hành các kiến thức về lập trình mạng, TCP Socket, mô hình Client–Server, xử lý đa luồng và quản lý dữ liệu.
 Phạm vi của đề tài tập trung vào việc xây dựng ứng dụng Chat Desktop bằng C# WinForms.
 Server đóng vai trò tiếp nhận kết nối, quản lý Client và xử lý dữ liệu, trong khi Client cung cấp giao diện để người dùng đăng nhập, gửi và nhận tin nhắn.
@@ -64,6 +64,7 @@ Port mặc định được cấu hình trong file: ChatTCP.Shared/Utils/Network
 IP và Port có thể thay đổi tùy theo môi trường chạy.
 
 - Cấu trúc message:
+```csharp
    public class Message
     {
         public int Id { get; set; }
@@ -79,7 +80,7 @@ IP và Port có thể thay đổi tùy theo môi trường chạy.
         public string? ReplyToContent { get; set; }
         public bool IsForward { get; set; } = false;
     }
-
+```
 ## Yêu cầu môi trường
 
 - Hệ điều hành: 
