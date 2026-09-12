@@ -98,7 +98,7 @@ SQL Server.
 Git.  
 GitHub.  
 
--Công nghệ sử dụng:  
+- Công nghệ sử dụng:  
 C#.  
 WinForms.  
 TCP Socket.  
