@@ -287,6 +287,102 @@ namespace ChatTCP.Server.Services
             return cmd.ExecuteNonQuery() > 0;
         }
 
+        // Xóa hoàn toàn người dùng và toàn bộ dữ liệu liên quan khỏi CSDL
+        public bool DeleteUser(int userId, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            if (userId <= 0)
+            {
+                errorMessage = "UserId không hợp lệ!";
+                return false;
+            }
+
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+                using var tran = conn.BeginTransaction();
+
+                try
+                {
+                    // 1. Gỡ bỏ tham chiếu ReplyToMessageId trỏ tới các tin nhắn của user sắp bị xóa
+                    string unlinkReplySql = @"
+                        UPDATE Messages 
+                        SET ReplyToMessageId = NULL 
+                        WHERE ReplyToMessageId IN (
+                            SELECT MessageId FROM Messages WHERE SenderId = @UserId OR ReceiverId = @UserId
+                        )";
+                    using (var cmd = new SqlCommand(unlinkReplySql, conn, tran))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 2. Xóa toàn bộ tin nhắn liên quan (gửi hoặc nhận bởi user này)
+                    string deleteMessagesSql = @"
+                        DELETE FROM Messages 
+                        WHERE SenderId = @UserId OR ReceiverId = @UserId";
+                    using (var cmd = new SqlCommand(deleteMessagesSql, conn, tran))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 3. Xóa user khỏi bảng GroupMembers
+                    string deleteMembersSql = @"
+                        DELETE FROM GroupMembers 
+                        WHERE UserId = @UserId";
+                    using (var cmd = new SqlCommand(deleteMembersSql, conn, tran))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 4. Cập nhật các nhóm do user này tạo (CreatedBy = NULL)
+                    string updateGroupsSql = @"
+                        UPDATE Groups 
+                        SET CreatedBy = NULL 
+                        WHERE CreatedBy = @UserId";
+                    using (var cmd = new SqlCommand(updateGroupsSql, conn, tran))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 5. Xóa user khỏi bảng Users
+                    string deleteUserSql = @"
+                        DELETE FROM Users 
+                        WHERE UserId = @UserId";
+                    using (var cmd = new SqlCommand(deleteUserSql, conn, tran))
+                    {
+                        cmd.Parameters.AddWithValue("@UserId", userId);
+                        int rows = cmd.ExecuteNonQuery();
+                        if (rows == 0)
+                        {
+                            tran.Rollback();
+                            errorMessage = "Không tìm thấy người dùng cần xóa trong CSDL.";
+                            return false;
+                        }
+                    }
+
+                    tran.Commit();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    tran.Rollback();
+                    errorMessage = ex.Message;
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+
+
         // QUẢN LÝ TIN NHẮN (MESSAGES)
 
         // Lưu tin nhắn vào CSDL (hỗ trợ cả Chat 1-1 và Nhóm, Reply, Forward)

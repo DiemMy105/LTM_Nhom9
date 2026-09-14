@@ -12,6 +12,7 @@ namespace ChatTCP.Client.UserControls
         private PictureBox picAvatar;
         private Label lblName;
         private Panel pnlStatus;
+        private Label lblBadge;
 
         public UserItem()
         {
@@ -45,6 +46,23 @@ namespace ChatTCP.Client.UserControls
             path.AddEllipse(0, 0, 12, 12);
             pnlStatus.Region = new Region(path);
 
+            lblBadge = new Label
+            {
+                AutoSize = false,
+                Size = new Size(24, 20),
+                Location = new Point(215, 20),
+                BackColor = Color.FromArgb(175, 35, 35),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Visible = false
+            };
+
+            GraphicsPath badgePath = new GraphicsPath();
+            badgePath.AddEllipse(0, 0, 24, 20);
+            lblBadge.Region = new Region(badgePath);
+
+            this.Controls.Add(lblBadge);
             this.Controls.Add(pnlStatus);
             this.Controls.Add(picAvatar);
             this.Controls.Add(lblName);
@@ -55,6 +73,19 @@ namespace ChatTCP.Client.UserControls
             UserId = userId;
             lblName.Text = userName;
             pnlStatus.BackColor = isOnline ? Color.LimeGreen : Color.Gray;
+        }
+
+        public void UpdateBadge(int unreadCount)
+        {
+            if (unreadCount <= 0)
+            {
+                lblBadge.Visible = false;
+            }
+            else
+            {
+                lblBadge.Text = unreadCount > 10 ? "10+" : unreadCount.ToString();
+                lblBadge.Visible = true;
+            }
         }
     }
 }

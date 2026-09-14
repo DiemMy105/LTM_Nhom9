@@ -22,6 +22,7 @@ namespace ChatTCP.Client.Network
             }
         }
         public event Action<Message>? MessageReceived;
+        public event Action? Disconnected;
 
         // Kết nối Client đến Server
         public bool Connect(string ip, int port)
@@ -115,6 +116,11 @@ namespace ChatTCP.Client.Network
             }
             catch
             {
+            }
+            finally
+            {
+                Disconnect();
+                Disconnected?.Invoke();
             }
         }
         // Ngắt kết nối
