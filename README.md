@@ -6,10 +6,10 @@ UDM_08 — Chat TCP Client–Server
 | STT | MSSV | Họ và tên | Vai trò |
 |---:|---|---|---|
 | 1 | 075306001575 | Nguyễn Hồ Diễm My | Phân công, theo dõi tiến độ, lập trình tính năng chat 1-1, xây dựng module kết nối socket phía client, xử lý định tuyến tin nhắn cá nhân giữa 2 client, gửi/nhận tin nhắn 1-1, thực hiện test case, làm word, tổng hợp báo cáo word, powerpoint |
-| 2 | 042205011735 | Võ Tùng Sơn | Cài đặt module Đăng nhập và Đăng ký, thiết kế Database, triển khai cơ chế băm mật khẩu và kiểm tra mật khẩu, xử lý lưu trữ tin nhắn/dữ liệu người dùng, thực hiện test case, làm word, powerpoint |
+| 2 | 042205011735 | Võ Tùng Sơn | Thiết kế Database, xử lý lưu trữ tin nhắn/dữ liệu người dùng; cấu hình IP và Port, logic Đăng nhập và Đăng ký, triển khai cơ chế băm mật khẩu và kiểm tra mật khẩu, thực hiện test case, làm word, powerpoint |
 | 3 | 056206002399 | Võ Duy Thịnh | Lập trình, truy vấn danh sách users và groups, xóa và ngắt kết nối client trên giao diện server, cập nhật trạng thái online,offline của client khi đăng nhập, đăng xuất, hiển thị số lượng tin nhắn mới chưa đọc,  thực hiện test case, làm word, powerpoint |
-| 4 | 082205013580 | Lưu Quốc Phú | Lập trình tính năng chat group, xử lý phát sóng tin nhắn nhóm tới các client trong nhóm, gửi/nhận tin nhắn nhóm, phối hợp hiện thị danh sách nhóm lên giao diện, thực hiện test case, làm word, powerpoint |
-| 5 | 083206006476 | Nguyễn Hồ Hùng Phương | Thiết kế Giao diện Client & Server,hiển thị IP/Port, chức năng xử lý avatar mặc định và upload avatar, thực hiện test case, powerpoint. |
+| 4 | 082205013580 | Lưu Quốc Phú | Lập trình chức năng chat nhóm gồm tạo nhóm, hiển thị danh sách, thành viên, xác định nhóm trưởng, thêm/xóa thành viên và giải tán nhóm, xử lý gửi, nhận và phát tin nhắn đến đúng các thành viên trong nhóm qua TCP, phối hợp tích hợp giao diện, thực hiện test case, làm word, powerpoint |
+| 5 | 083206006476 | Nguyễn Hồ Hùng Phương | Thiết kế Giao diện Client & Server,hiển thị IP/Port, chức năng xử lý avatar mặc định và upload avatar, thực hiện test case,  làm word, powerpoint. |
 | 6 | 001206022589 | Nguyễn Đặng Thái Bình | Lập trình các tính năng tin nhắn mở rộng: Forward (Chuyển tiếp), Reply, Xử lý mã hóa & hiển thị Emoji, chat bubble, làm word, powerpoint |
 
 ## Giới thiệu
